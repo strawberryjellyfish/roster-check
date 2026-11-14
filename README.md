@@ -14,8 +14,31 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
-uv run roster-check --version
+uv run roster-check
 ```
+
+With no options it runs on the bundled sample data, writes `roster-check-report.html` in the current folder and prints a short summary. Open the report in any browser.
+
+To check your own files:
+
+```bash
+uv run roster-check --rosters my_rosters.csv --sessions my_sessions.csv --out report.html
+```
+
+| Option | What it does |
+|---|---|
+| `--rosters PATH` | Roster CSV file. Defaults to the bundled sample. |
+| `--sessions PATH` | Session CSV file. Defaults to the bundled sample. |
+| `--rules PATH` | Staffing rules CSV file. Defaults to the bundled rules. |
+| `--out PATH` | Report file to write, replacing any existing one. Defaults to `roster-check-report.html`. |
+| `--db-file PATH` | Also save the DuckDB database, with its tables and analysis views, to this file. |
+| `--summarise` | Add an AI-written summary. Not available yet; the tool notes that it skipped it. |
+| `--strict` | Exit with code 1 if any row was rejected. |
+| `--open` | Open the report in the default browser. |
+| `--debug` | Show the full traceback when something goes wrong. |
+| `--version` | Print the version and exit. |
+
+Exit codes: `0` success, `1` unexpected error or a `--strict` failure, `2` an input file that cannot be used (no report is written).
 
 Run the tests and checks:
 

@@ -260,8 +260,7 @@ roster-check/
 │   ├── workflows/ci.yml
 │   └── pull_request_template.md
 ├── scripts/
-│   ├── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
-│   └── preview_report.py         # development aid: the sample report, until the CLI writes it (M6)
+│   └── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
 ├── dashboard/                    # STRETCH (M9): optional Evidence.dev project, needs Node
 │   ├── package.json
 │   ├── sources/roster_check/     # DuckDB connection to the --db-file output
@@ -514,10 +513,14 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D27 | Chart data tables sit in collapsed "Show the numbers" sections. | Keeps the page short and printable while every number stays available to screen readers and on request. | 5.1 |
 | D28 | `report` takes each data file's `ValidationResult`; the header badge counts rejected rows only. | Reuses an agreed structure for the problem lists and the case 18 banner. Auto-fixed rows were used, so they do not need attention. | 6.2, 5.2 |
 | D29 | Print uses two A4 landscape pages: the analysis, then data problems and method. | Seventeen problem rows with their raw text cannot share one page with the charts at a readable size. | 5.1 |
+| D30 | An existing report is replaced without asking. An existing `--db-file` is replaced only after the inputs pass validation. | Repeat runs behave like the first run, and a run that stops on bad input never deletes a saved database. | 6.3 |
+| D31 | A fatal input error exits with code 2 even with `--strict`. | The run stops before any rows are checked, so there is nothing for `--strict` to judge. | 6.3 |
+| D32 | When `--open` cannot start a browser, the tool prints where the report is and exits with code 0. | The report was written, which is the job; headless machines and CI have no browser. | 6.3 |
+| D33 | The terminal summary has one line per data file (rows read, rejected, auto-fixed, blank lines skipped), a note per file read as Windows-1252 or with ignored columns, then the understaffed count and the report path. An output folder that does not exist, or a report that cannot be written, is a fatal input error. | Shows where the problems are without opening the report. Output paths are user input, handled like input paths. | 6.3, 4.5 |
+| D34 | `--summarise` is accepted from M6 and prints "Skipping AI summary: not available in this version" until M7. `--db-file` is built in M6. The preview script is removed now that the command writes the report. | The command line is complete in M6 as 6.3 lists it; M7 only replaces the stub. | 6.3, 9 |
 
 ### Still open
 
 These are decided at the start of the milestone that needs them:
 
 - The wording of the Claude prompt (6.4). Before M7.
-- CLI edge cases: overwriting an existing report, which exit code wins when `--strict` and a fatal error both apply, and `--open` when no browser is available. Before M6.
