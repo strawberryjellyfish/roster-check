@@ -1,0 +1,6 @@
+activity,role,participants_per_staff,minimum_staff
+swim_lesson,swim_instructor,8,1
+swim_lesson,lifeguard,30,1
+lap_swim,lifeguard,25,1
+gym_floor,gym_supervisor,25,1
+group_fitness,group_fitness,30,1

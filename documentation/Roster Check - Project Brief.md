@@ -60,7 +60,7 @@ Runtime dependencies are only `duckdb` and `jinja2`. Everything else is dev-only
 
 All data is invented. Staff names come from a fixed list of obviously fictional names, IDs are synthetic, and there are no phone numbers, emails or addresses anywhere.
 
-The sample data covers **4 centres over 2 weeks** (roughly 250 sessions and 400 shifts), which is enough to make the charts interesting but small enough to read.
+The sample data covers **4 centres over 2 weeks** (288 sessions and 563 shifts, from Monday 2 to Sunday 15 November 2026), which is enough to make the charts interesting but small enough to read.
 
 Centres: `RBC` Riverbend Central, `NTH` Northgate, `HLS` Hillside, `LKV` Lakeview. These are held as reference data in `centres.csv` (see 4.3).
 
@@ -123,7 +123,7 @@ How these rules are applied is set out in 4.6.
 
 ### 4.4 Deliberate bad data and how each case is handled
 
-The sample CSVs contain about 15 to 20 bad rows spread across both files, so the "data problems" section of the report is always populated in the demo. Each case below has its own test.
+The sample CSVs contain about 20 bad rows spread across both files, so the "data problems" section of the report is always populated in the demo. Every row-level case (1 to 14) appears in the sample, and case 15 is covered by writing `rosters.csv` as an Excel export. Cases 16 to 18 would stop the sample run from producing a report, so they are covered by fixtures in `tests/fixtures/` instead. Each case below has its own test.
 
 Rows fall into three outcomes:
 
@@ -228,11 +228,6 @@ roster-check/
 ├── .github/
 │   ├── workflows/ci.yml
 │   └── pull_request_template.md
-├── data/
-│   ├── sample/rosters.csv
-│   ├── sample/sessions.csv
-│   ├── staffing_rules.csv
-│   └── centres.csv
 ├── scripts/
 │   └── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
 ├── dashboard/                    # STRETCH (M9): optional Evidence.dev project, needs Node
@@ -244,6 +239,12 @@ roster-check/
 │   ├── __main__.py               # python -m roster_check
 │   ├── cli.py                    # argparse, exit codes, top-level error handling
 │   ├── models.py                 # dataclasses: see 6.2.1
+│   ├── data/                     # bundled data, loaded with importlib.resources
+│   │   ├── centres.csv
+│   │   ├── staffing_rules.csv
+│   │   └── sample/
+│   │       ├── rosters.csv
+│   │       └── sessions.csv
 │   ├── ingest.py                 # read raw CSV text, keep line numbers, header checks
 │   ├── validate.py               # per-field parsers and row rules -> (valid, rejected, warnings)
 │   ├── db.py                     # DuckDB connection, load tables, run a .sql file
@@ -439,6 +440,8 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D12 | Shortfall is summed across roles; the worst ten are ranked with a fixed tie-break order. | Deterministic results for tests and readers. | 4.6, 5.2 |
 | D13 | Staff hours include every role. | "Rostered hours" means all rostered hours. | 4.6 |
 | D14 | Heatmap places each session in its starting hour. | Every session appears exactly once. | 5.2 |
+| D15 | Bundled data lives inside the package, in `src/roster_check/data/`. | `pip install .` includes it, so running with no arguments works after a normal install, not only from a clone. | 6.1 |
+| D16 | The sample covers every row-level bad-data case; fatal cases 16 to 18 are covered by test fixtures. CSV files are stored byte for byte in git. | A fatal case in the sample would stop the demo report. Git line-ending conversion would otherwise remove case 15. | 4.4 |
 
 ### Still open
 

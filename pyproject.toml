@@ -35,8 +35,9 @@ select = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-# Tests use bare asserts and descriptive test names instead of docstrings.
-"tests/**" = ["S101", "D103"]
+# Tests use bare asserts and descriptive test names instead of docstrings, and
+# run trusted project scripts as subprocesses.
+"tests/**" = ["S101", "S603", "D103"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
