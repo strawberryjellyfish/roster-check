@@ -280,6 +280,8 @@ roster-check/
 │   ├── validate.py               # per-field parsers and row rules -> (valid, rejected, warnings)
 │   ├── db.py                     # DuckDB connection, load tables, run a .sql file
 │   ├── sql/
+│   │   ├── 00_tables.sql
+│   │   ├── load_*.sql            # one parameterised insert per table
 │   │   ├── 01_required_staff.sql
 │   │   ├── 02_staff_on_session.sql
 │   │   ├── 03_understaffed.sql
@@ -312,7 +314,7 @@ roster-check/
 |---|---|---|---|
 | `ingest` | file path | header plus list of `(line_number, raw_text, fields)` | Handles BOM, line endings, blank lines. Raises `InputError` for fatal cases. |
 | `validate` | raw rows, known centres, rules | `ValidationResult(valid, rejected, warnings)` | Pure functions, no I/O. One parser per field type. |
-| `db` | valid rows, rejections | DuckDB connection with `shifts`, `sessions`, `rules`, `rejections` tables | Uses explicit column types. Reads SQL files via `importlib.resources`. |
+| `db` | valid rows, rejections, centres, rules | DuckDB connection with `shifts`, `sessions`, `rules`, `centres`, `rejections` tables and the analysis views | Uses explicit column types. Reads SQL files via `importlib.resources`. |
 | `analysis` | connection | `ReportData` dataclass | All numbers the report needs, nothing else. |
 | `charts` | plain lists and dicts | SVG strings | No DuckDB, no Jinja. |
 | `summarise` | `ReportData` | `str` or `None` | Sends aggregates only. Returns `None` on any failure. |
@@ -341,7 +343,23 @@ Structures passed between `ingest` and `validate`:
 | `ValidationResult` | `valid`, `rejected`, `warnings`: what `validate` returns for each data file |
 | `InputError` | Exception for fatal problems, carrying the one-line message shown to the user |
 
-`RowWarning` is named to avoid clashing with Python's built-in `Warning` class. `ReportData` is defined at the start of M3, when the analysis outputs are built, and confirmed before use.
+`RowWarning` is named to avoid clashing with Python's built-in `Warning` class.
+
+`ReportData`, returned by `analysis`, holds every number the report needs and nothing else. It contains no staff names or IDs, so it is safe to pass to the AI summary; a test enforces this. Percentages are properties calculated from the counts.
+
+| Dataclass | Fields |
+|---|---|
+| `ReportData` | `period_start`, `period_end` (`date \| None`), `kpis`, `centres`, `heatmap`, `daily`, `worst_sessions`, `staffing_rules` |
+| `Kpis` | `sessions_analysed`, `understaffed_sessions`, `staff_hours`, `total_attendance`, `rows_rejected`; property `understaffed_percent` |
+| `CentreSummary` | `centre_code`, `centre_name`, `sessions`, `understaffed_sessions`; property `understaffed_percent` |
+| `HeatmapCell` | `weekday` (Monday is 0), `hour`, `sessions`, `understaffed_sessions`, `shortfall`; only cells with sessions |
+| `DailyTotal` | `day`, `attendance`, `staff_hours` |
+| `UnderstaffedSession` | `session_id`, `session_date`, `centre_name`, `activity`, `start_time`, `end_time`, `attendance`, `shortfall`, `roles` |
+| `RoleShortfall` | `role`, `required`, `present`; only roles that were short |
+
+#### SQL organisation
+
+All SQL is in `src/roster_check/sql/`. `00_tables.sql` creates the tables, one `load_*.sql` file per table holds its parameterised insert, and files `01` to `04` create views: required staff, staff present, shortfall by role and session, and one `report_*` view per report section. The only SQL text in Python is `SELECT * FROM <view>`, with the view name checked against a fixed list. Keeping the logic in views means the stretch Evidence dashboard can reuse it from a `--db-file` database.
 
 ### 6.3 Command line
 
@@ -485,6 +503,8 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D17 | Ingest and validation structures (`RawRow`, `CsvFile`, `ValidationResult`, `InputError`); reference-row failures raise `InputError` from `validate`. | Agreed structures before M2; the fatal rule for reference data lives in one place. | 6.2.1 |
 | D18 | One record per line, physical line numbers, column count checked first, fields checked in the brief's order. | Raw text can be shown for every row, line numbers match a text editor, and the reason for a row does not depend on the file's column order. | 4.5 |
 | D19 | Exact wording for every message. | Messages are tested exactly, so wording changes are deliberate. | 4.5 |
+| D20 | `ReportData` structure, with percentages as calculated properties and no staff names or IDs. | One place for every report figure; safe to pass to the AI summary by construction. | 6.2.1 |
+| D21 | All SQL in files: tables, parameterised loads, and views for every calculation and report section. A `centres` table is added. | Meets the rule that SQL lives in `.sql` files, keeps values out of SQL text, and lets the dashboard reuse the same logic. | 6.2.1 |
 
 ### Still open
 
