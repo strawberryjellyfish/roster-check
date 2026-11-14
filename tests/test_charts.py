@@ -298,6 +298,35 @@ def test_daily_chart_labels_at_most_seven_dates() -> None:
     ]
 
 
+@pytest.mark.parametrize("cluster_size", [3, 14])
+def test_daily_date_labels_stay_apart_across_a_large_gap(cluster_size: int) -> None:
+    days = [date(2026, 1, day) for day in range(1, cluster_size + 1)]
+    days.append(date(2026, 11, 1))
+    root = parse(daily_chart([DailyTotal(day, 10, 1.0) for day in days]))
+
+    labels = [t for t in root.iter("text") if t.get("text-anchor") == "middle"]
+    assert [label.text for label in labels] == ["Thu 1 Jan", "Sun 1 Nov"]
+    assert float(labels[1].get("x")) - float(labels[0].get("x")) >= 80
+    points = with_class(root, "circle", "point")
+    assert len(points) == 2 * len(days)
+    expected_xs = [56 + 560 * (day - days[0]).days / 304 for day in days]
+    for panel in (points[: len(days)], points[len(days) :]):
+        assert [float(point.get("cx")) for point in panel] == pytest.approx(
+            expected_xs, abs=0.05
+        )
+
+
+def test_daily_chart_preserves_one_minute_of_staff_hours() -> None:
+    root = parse(daily_chart([DailyTotal(date(2026, 11, 2), 1, 1 / 60)]))
+
+    axis_labels = [t.text for t in with_class(root, "text", "axis")]
+    assert axis_labels[3:6] == ["0", "0.01", "0.02"]
+    point = with_class(root, "circle", "point")[1]
+    assert point.find("title").text == "Mon 2 Nov: staff hours 0.0167"
+    baseline = with_class(root, "line", "grid")[3]
+    assert float(point.get("cy")) < float(baseline.get("y1"))
+
+
 def test_shortfall_bar_is_proportional_to_the_largest_shortfall() -> None:
     full = parse(shortfall_bar(4, 4))
     half = parse(shortfall_bar(2, 4))

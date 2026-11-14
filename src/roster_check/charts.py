@@ -57,7 +57,7 @@ DAILY_PANEL_HEIGHT = 120
 DAILY_PANEL_TITLE_HEIGHT = 24
 DAILY_PANEL_GAP = 16
 DAILY_DATE_LABEL_HEIGHT = 28
-DAILY_MAX_DATE_LABELS = 7
+DAILY_MIN_DATE_LABEL_SPACING = 84
 
 # Multiples of a power of ten allowed as the top of an axis. Halving each
 # gives the middle gridline, which stays a round number too.
@@ -213,8 +213,11 @@ def daily_chart(daily: Sequence[DailyTotal]) -> str:
         ),
     ]
     date_label_top = 2 * panel_step - DAILY_PANEL_GAP
-    step = math.ceil(len(days) / DAILY_MAX_DATE_LABELS)
-    for x, day in list(zip(x_positions, days, strict=True))[::step]:
+    last_label_x = -math.inf
+    for x, day in zip(x_positions, days, strict=True):
+        if x - last_label_x < DAILY_MIN_DATE_LABEL_SPACING:
+            continue
+        last_label_x = x
         parts.append(
             _text(
                 x,
@@ -344,7 +347,7 @@ def _line_panel(
             _text(
                 DAILY_AXIS_WIDTH - 8,
                 y,
-                _format_value(fraction * axis_max),
+                _format_value(fraction * axis_max, interval=axis_max / 2),
                 "axis",
                 anchor="end",
             )
@@ -433,9 +436,19 @@ def _nice_ceiling(value: float) -> float:
     return float(next(step * power for step in AXIS_STEPS if value <= step * power))
 
 
-def _format_value(value: float) -> str:
-    """Return a value with thousands separators and at most one decimal place."""
-    return f"{value:,.1f}".removesuffix(".0")
+def _format_value(value: float, *, interval: float | None = None) -> str:
+    """Format a value, keeping small values and axis tick intervals distinct.
+
+    Use at least three significant digits for small values or tick intervals,
+    and at least one decimal place before trimming trailing zeros.
+    """
+    precision_value = abs(value) if interval is None else interval
+    precision = (
+        max(1, 2 - math.floor(math.log10(precision_value)))
+        if precision_value > 0
+        else 1
+    )
+    return f"{value:,.{precision}f}".rstrip("0").rstrip(".")
 
 
 def _number(value: float) -> str:
