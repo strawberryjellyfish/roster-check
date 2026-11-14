@@ -1,12 +1,20 @@
 """Tests for loading records into DuckDB and reading the analysis views."""
 
 from importlib.resources import files
+from pathlib import Path
 
 import duckdb
 import pytest
-from builders import build_database, lifeguard, make_session, make_shift
+from builders import (
+    CENTRES,
+    RULES,
+    build_database,
+    lifeguard,
+    make_session,
+    make_shift,
+)
 
-from roster_check.db import VIEW_FILES, VIEW_NAMES, fetch_view
+from roster_check.db import VIEW_FILES, VIEW_NAMES, create_database, fetch_view
 from roster_check.models import Rejection
 
 TABLES = frozenset({"centres", "rules", "shifts", "sessions", "rejections"})
@@ -91,3 +99,22 @@ def test_fetch_view_returns_rows_keyed_by_column() -> None:
 )
 def test_sql_files_are_bundled_in_the_package(name: str) -> None:
     assert files("roster_check").joinpath("sql", name).is_file()
+
+
+def test_database_file_keeps_tables_and_views_after_closing(tmp_path: Path) -> None:
+    database_file = tmp_path / "roster_check.duckdb"
+    connection = create_database(
+        centres=CENTRES,
+        rules=RULES,
+        shifts=[lifeguard()],
+        sessions=[make_session()],
+        rejections=[],
+        database_file=database_file,
+    )
+    connection.close()
+
+    with duckdb.connect(str(database_file), read_only=True) as reopened:
+        for view in VIEW_NAMES:
+            assert isinstance(fetch_view(reopened, view), list)
+        assert count_rows(reopened, "shifts") == 1
+        assert count_rows(reopened, "sessions") == 1
