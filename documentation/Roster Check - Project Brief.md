@@ -60,7 +60,7 @@ Runtime dependencies are only `duckdb` and `jinja2`. Everything else is dev-only
 
 All data is invented. Staff names come from a fixed list of obviously fictional names, IDs are synthetic, and there are no phone numbers, emails or addresses anywhere.
 
-The sample data covers **4 centres over 2 weeks** (288 sessions and 563 shifts, from Monday 2 to Sunday 15 November 2026), which is enough to make the charts interesting but small enough to read.
+The sample data covers **4 centres over 2 weeks** (288 sessions and 556 shifts, from Monday 2 to Sunday 15 November 2026), which is enough to make the charts interesting but small enough to read.
 
 Centres: `RBC` Riverbend Central, `NTH` Northgate, `HLS` Hillside, `LKV` Lakeview. These are held as reference data in `centres.csv` (see 4.3).
 

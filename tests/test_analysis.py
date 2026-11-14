@@ -231,8 +231,8 @@ def test_golden_headline_numbers_for_the_sample(sample_report: ReportData) -> No
     assert sample_report.period_start == date(2026, 11, 2)
     assert sample_report.period_end == date(2026, 11, 15)
     assert sample_report.kpis.sessions_analysed == 281
-    assert sample_report.kpis.understaffed_sessions == 36
-    assert sample_report.kpis.staff_hours == 2195.75
+    assert sample_report.kpis.understaffed_sessions == 43
+    assert sample_report.kpis.staff_hours == 2165.5
     assert sample_report.kpis.total_attendance == 7234
     assert sample_report.kpis.rows_rejected == 17
 
@@ -241,4 +241,4 @@ def test_golden_centre_numbers_for_the_sample(sample_report: ReportData) -> None
     assert [
         (c.centre_code, c.sessions, c.understaffed_sessions)
         for c in sample_report.centres
-    ] == [("HLS", 70, 8), ("LKV", 70, 7), ("NTH", 70, 15), ("RBC", 71, 6)]
+    ] == [("HLS", 70, 7), ("LKV", 70, 9), ("NTH", 70, 17), ("RBC", 71, 10)]

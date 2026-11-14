@@ -114,7 +114,8 @@ STAFF_PER_CENTRE = {
 # Deliberate understaffing, so the report shows clear patterns rather than
 # noise: (centre, role, weekdays, shift start, staff removed). Monday is 0.
 UNDERSTAFFING_PATTERNS = [
-    ("NTH", "swim_instructor", {0, 1, 2, 3}, "15:45", 1),
+    ("NTH", "swim_instructor", {0, 2}, "15:45", 1),
+    ("NTH", "swim_instructor", {1, 3}, "15:45", 2),
     ("HLS", "gym_supervisor", {5}, "08:00", 1),
     ("LKV", "lifeguard", {0}, "05:45", 1),
 ]
