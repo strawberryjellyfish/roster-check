@@ -1,5 +1,9 @@
 """Database: load validated records into DuckDB and read the analysis views.
 
+The database is kept in memory unless the caller passes in a connection, for
+example one backed by a file that the optional dashboard can read. Opening such
+a file is left to the command line.
+
 All SQL lives in ``.sql`` files under ``roster_check/sql``. Values always reach
 the database as bound parameters, and views are read by name through DuckDB's
 relation API, with the name checked against a fixed list. No SQL is built in
@@ -48,8 +52,9 @@ def create_database(
     shifts: Sequence[Shift],
     sessions: Sequence[Session],
     rejections: Sequence[Rejection],
+    connection: duckdb.DuckDBPyConnection | None = None,
 ) -> duckdb.DuckDBPyConnection:
-    """Create an in-memory database holding the records and the analysis views.
+    """Load the records and the analysis views into a database.
 
     Args:
         centres: Known centres.
@@ -57,11 +62,16 @@ def create_database(
         shifts: Valid shifts.
         sessions: Valid sessions.
         rejections: Rejected rows from every file.
+        connection: An open connection to an empty database to load into,
+            for example one backed by a file so other tools can read the same
+            tables and views. When ``None``, a new in-memory database is used.
 
     Returns:
-        An open connection. The caller closes it when finished.
+        The connection holding the loaded database. The caller closes it when
+        finished.
     """
-    connection = duckdb.connect()
+    if connection is None:
+        connection = duckdb.connect(":memory:")
     run_sql_file(connection, TABLES_FILE)
     load_records(connection, "load_centres.sql", centres)
     load_records(connection, "load_rules.sql", rules)

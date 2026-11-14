@@ -145,7 +145,7 @@
     {% endif %}
     {% if file.warnings %}
     <details>
-      <summary>Auto-fixed ({{ file.warnings | length }})</summary>
+      <summary>Auto-fixed or flagged ({{ file.warnings | length }})</summary>
       <div class="table-scroll">
         <table class="problems">
           <thead><tr><th scope="col" class="number">Line</th><th scope="col">What happened</th><th scope="col">Row as written</th></tr></thead>

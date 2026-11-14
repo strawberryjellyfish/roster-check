@@ -328,7 +328,7 @@ def _worst_session_rows(
 def _problem_files(
     data_files: Sequence[ValidationResult[Any]],
 ) -> list[dict[str, Any]]:
-    """Group rejected and auto-fixed rows by file, leaving out clean files.
+    """Group rejected, auto-fixed and flagged rows by file, leaving out clean files.
 
     Returns:
         One entry per file with problems, each with its name, its rejected

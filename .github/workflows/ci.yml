@@ -47,5 +47,14 @@ jobs:
       - name: Run tests with coverage
         run: uv run pytest --cov
 
-      - name: Run the command
-        run: uv run roster-check --version
+      - name: Run the command on the sample data
+        run: uv run roster-check --out roster-check-report.html
+
+      # One copy of the report is enough for reviewers, so only one job uploads it.
+      - name: Upload the sample report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: roster-check-report
+          path: roster-check-report.html
+          if-no-files-found: error
