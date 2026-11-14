@@ -419,6 +419,28 @@ def test_rejection_records_file_line_and_raw_text() -> None:
     assert rejection.raw_text == line
 
 
+# Lines the CSV reader could not parse
+
+
+def test_row_ingest_could_not_parse_is_rejected_with_its_reason() -> None:
+    bad = RawRow(2, 'SH-00001,RBC,"Jordan', (), "Row has an unfinished quoted field")
+    good = RawRow(3, GOOD_SHIFT, tuple(GOOD_SHIFT.split(",")))
+    csv_file = CsvFile("rosters.csv", ROSTER_COLUMNS, (bad, good), 0, (), False)
+
+    result = validate_shifts(csv_file, CENTRE_CODES)
+
+    assert [rejection.reason for rejection in result.rejected] == [
+        "Row has an unfinished quoted field"
+    ]
+    assert [shift.line_number for shift in result.valid] == [3]
+
+
+def test_number_too_long_to_convert_is_rejected() -> None:
+    line = session_with(attendance="9" * 5000)
+
+    assert session_reason(line) == "Attendance is too long to be a number"
+
+
 # Case 18: every row rejected
 
 
@@ -495,6 +517,10 @@ def test_bundled_reference_files_are_valid() -> None:
         ("swim_lesson,lifeguard,,1", "Missing participants per staff"),
         ("swim_lesson,lifeguard,8,-1", "Minimum staff cannot be negative"),
         ("swim_lesson,cleaner,8,1", "Unknown role 'cleaner'"),
+        (
+            f"swim_lesson,lifeguard,{'9' * 5000},1",
+            "Participants per staff is too long to be a number",
+        ),
     ],
 )
 def test_bad_staffing_rule_is_fatal(line: str, message: str) -> None:

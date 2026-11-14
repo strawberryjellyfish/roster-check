@@ -322,10 +322,14 @@ def parse_whole_number(text: str, label: str) -> int:
     """Parse a whole number, which may be negative.
 
     Raises:
-        RowError: If the text is a decimal or not a number at all.
+        RowError: If the text is a decimal, not a number at all, or has more
+            digits than Python will convert.
     """
     if WHOLE_NUMBER.fullmatch(text):
-        return int(text)
+        try:
+            return int(text)
+        except ValueError:
+            raise RowError(f"{label.capitalize()} is too long to be a number") from None
     if DECIMAL_NUMBER.fullmatch(text):
         raise RowError(f"{label.capitalize()} '{text}' is not a whole number")
     raise RowError(f"{label.capitalize()} '{text}' is not a number")
@@ -364,9 +368,10 @@ def _validate_rows(
 ) -> ValidationResult[T]:
     """Apply the checks shared by every file, then build a record per row.
 
-    In order, each row is checked for its column count, cleaned, checked for
-    a duplicate key, and passed to ``build``. The first row with a key claims
-    it, even if that row is later rejected. Rows with the wrong number of
+    In order, each row is checked for a parsing problem from ``ingest`` and
+    for its column count, cleaned, checked for a duplicate key, and passed to
+    ``build``. The first row with a key claims it, even if that row is later
+    rejected. Rows that could not be parsed, rows with the wrong number of
     columns and rows with a blank key claim nothing.
 
     Args:
@@ -388,6 +393,8 @@ def _validate_rows(
 
     for row in csv_file.rows:
         try:
+            if row.problem is not None:
+                raise RowError(row.problem)
             if len(row.fields) != len(csv_file.header):
                 message = (
                     f"Expected {len(csv_file.header)} columns, found {len(row.fields)}"

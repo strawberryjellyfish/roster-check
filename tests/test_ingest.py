@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from roster_check.ingest import read_csv
+from roster_check.ingest import FIELD_TOO_LONG, UNFINISHED_QUOTE, read_csv
 from roster_check.models import InputError
 from roster_check.validate import ROSTER_COLUMNS, SESSION_COLUMNS
 
@@ -136,5 +136,63 @@ def test_unreadable_file_raises_input_error(
 
     with pytest.raises(InputError) as error:
         read_csv(path, ROSTER_COLUMNS)
+
+    assert str(error.value) == "Could not read rosters.csv"
+
+
+def test_unfinished_quote_is_reported_not_parsed(tmp_path: Path) -> None:
+    path = tmp_path / "rosters.csv"
+    lines = [
+        'SH-00001,RBC,S-001,"Jordan',
+        'Placeholder",lifeguard,03/11/2026,06:00,10:30',
+        'SH-00002,RBC,S-002,Casey Example,lifeguard,03/11/2026,06:00,"10:30',
+    ]
+    path.write_text("\n".join([",".join(ROSTER_COLUMNS), *lines]), encoding="utf-8")
+
+    csv_file = read_csv(path, ROSTER_COLUMNS)
+
+    assert [row.problem for row in csv_file.rows] == [UNFINISHED_QUOTE] * 3
+    assert all(row.fields == () for row in csv_file.rows)
+    assert [row.raw_text for row in csv_file.rows] == lines
+
+
+def test_oversized_field_in_an_ignored_column_is_reported_not_raised(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "rosters.csv"
+    huge_note = "x" * 200_000
+    path.write_text(
+        f"{','.join(ROSTER_COLUMNS)},notes\n{FIRST_ROW},{huge_note}\n{FIRST_ROW},ok\n",
+        encoding="utf-8",
+    )
+
+    csv_file = read_csv(path, ROSTER_COLUMNS)
+
+    assert csv_file.rows[0].problem == FIELD_TOO_LONG
+    assert csv_file.rows[0].fields == ()
+    assert csv_file.rows[1].problem is None
+
+
+def test_unparseable_header_raises_input_error(tmp_path: Path) -> None:
+    path = tmp_path / "rosters.csv"
+    path.write_text(f'"shift_id,{FIRST_ROW}\n', encoding="utf-8")
+
+    with pytest.raises(InputError) as error:
+        read_csv(path, ROSTER_COLUMNS)
+
+    assert str(error.value) == "Could not read rosters.csv"
+
+
+def test_permission_error_while_checking_the_file_raises_input_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def refuse(_self: Path) -> bool:
+        raise PermissionError
+
+    monkeypatch.setattr(Path, "is_file", refuse)
+
+    with pytest.raises(InputError) as error:
+        read_csv(tmp_path / "rosters.csv", ROSTER_COLUMNS)
 
     assert str(error.value) == "Could not read rosters.csv"

@@ -163,7 +163,7 @@ The tool must never crash with a Python traceback on bad input. Any unexpected e
 - **Duplicate IDs (case 11).** The first row with an ID claims it, even if that row is rejected for another reason. Later rows with the same ID are rejected.
 - **Headers.** Column names are matched ignoring case and surrounding spaces, and columns may appear in any order. Extra columns are ignored and noted once in the terminal summary. The column count check (case 12) compares each row with the header.
 - **Encoding.** Files are read as UTF-8, with or without a byte-order mark. If that fails, the file is read as Windows-1252 and a one-line note is added to the terminal summary.
-- **One record per line.** Each line is parsed on its own so its raw text can be shown in the report. Quoted fields containing line breaks are not supported and fail the column count check.
+- **One record per line.** Each line is parsed on its own so its raw text can be shown in the report. A line the CSV reader cannot parse (an unfinished quote, which includes quoted fields containing line breaks, or a field over the reader's size limit) is rejected as a row, never read as a partial row.
 - **Line numbers** are physical lines in the file, with the header as line 1.
 - **Check order.** The column count is checked first; a row with the wrong number of columns claims no ID. Fields are then checked in the order section 4 lists them, whatever the file's column order. A blank ID claims nothing.
 - **Roles** are the fixed list in 4.1. Every role in `staffing_rules.csv` must be one of them, and a repeated activity and role pair there is fatal.
@@ -188,8 +188,10 @@ The exact text is fixed by tests. `{label}` is the plain-English column name, fo
 | Unknown value | `Unknown centre 'XYZ'`, `Unknown role 'cleaner'`, `Unknown activity 'aqua_zumba'` |
 | Duplicate ID or rule | `Duplicate shift ID, first seen on line 88` |
 | Wrong column count | `Expected 8 columns, found 6` |
+| Line cannot be parsed | `Row has an unfinished quoted field`, `Row has a field that is too long` |
+| Number with too many digits | `Attendance is too long to be a number` |
 | Cleaned (warning) | `Cleaned spacing and capitals` |
-| Fatal: file | `rosters.csv not found`, `rosters.csv has no rows`, `Could not read rosters.csv` |
+| Fatal: file | `rosters.csv not found`, `rosters.csv has no rows`, `Could not read rosters.csv` (unreadable file or header) |
 | Fatal: header | `rosters.csv is missing column 'staff_id'`, `rosters.csv has duplicate column 'role'` |
 | Fatal: reference row | `staffing_rules.csv line 4: Unknown role 'cleaner'` |
 

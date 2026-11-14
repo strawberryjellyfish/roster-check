@@ -27,11 +27,15 @@ class RawRow:
         raw_text: The line exactly as it appears in the file, without its
             line ending. Shown in the report so users can find the row.
         fields: The line split into fields, in the file's column order.
+            Empty if the line could not be parsed.
+        problem: Why the line could not be parsed as CSV, or ``None``.
+            Validation rejects the row with this reason.
     """
 
     line_number: int
     raw_text: str
     fields: tuple[str, ...]
+    problem: str | None = None
 
 
 @dataclass(frozen=True)

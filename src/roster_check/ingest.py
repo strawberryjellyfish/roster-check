@@ -12,6 +12,9 @@ from roster_check.models import CsvFile, InputError, RawRow
 
 FALLBACK_ENCODING = "cp1252"
 
+UNFINISHED_QUOTE = "Row has an unfinished quoted field"
+FIELD_TOO_LONG = "Row has a field that is too long"
+
 
 def read_csv(path: Path, required_columns: Sequence[str]) -> CsvFile:
     """Read a CSV file and check that it can be used.
@@ -37,7 +40,10 @@ def read_csv(path: Path, required_columns: Sequence[str]) -> CsvFile:
     if not lines:
         raise InputError(f"{file_name} has no rows")
 
-    header = tuple(name.strip().lower() for name in _parse_line(lines[0]))
+    header_fields, header_problem = _parse_line(lines[0])
+    if header_problem is not None:
+        raise InputError(f"Could not read {file_name}")
+    header = tuple(name.strip().lower() for name in header_fields)
     _check_header(file_name, header, required_columns)
 
     rows = []
@@ -46,7 +52,8 @@ def read_csv(path: Path, required_columns: Sequence[str]) -> CsvFile:
         if not line.strip():
             blank_lines += 1
             continue
-        rows.append(RawRow(line_number, line, _parse_line(line)))
+        fields, problem = _parse_line(line)
+        rows.append(RawRow(line_number, line, fields, problem))
     if not rows:
         raise InputError(f"{file_name} has no rows")
 
@@ -67,9 +74,9 @@ def _read_text(path: Path) -> tuple[str, bool]:
         The decoded text and whether the fallback encoding was used.
     """
     file_name = path.name
-    if not path.is_file():
-        raise InputError(f"{file_name} not found")
     try:
+        if not path.is_file():
+            raise InputError(f"{file_name} not found")
         data = path.read_bytes()
     except OSError:
         raise InputError(f"Could not read {file_name}") from None
@@ -97,9 +104,25 @@ def _split_lines(text: str) -> list[str]:
     return lines
 
 
-def _parse_line(line: str) -> tuple[str, ...]:
-    """Split one CSV line into fields, honouring quotes."""
-    return tuple(next(csv.reader([line])))
+def _parse_line(line: str) -> tuple[tuple[str, ...], str | None]:
+    """Split one CSV line into fields, honouring quotes.
+
+    A properly quoted line always holds an even number of quote characters,
+    so an odd number means a quoted field was never closed. Such a line is
+    reported rather than parsed, so a fragment is never mistaken for a row.
+
+    Returns:
+        The fields and ``None``, or no fields and the reason the line could
+        not be read.
+    """
+    if line.count('"') % 2:
+        return (), UNFINISHED_QUOTE
+    try:
+        return tuple(next(csv.reader([line]))), None
+    except csv.Error:
+        # For one line with balanced quotes, the reader only raises when a
+        # field is over its size limit.
+        return (), FIELD_TOO_LONG
 
 
 def _check_header(
