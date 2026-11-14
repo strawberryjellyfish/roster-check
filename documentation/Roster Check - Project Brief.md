@@ -117,6 +117,8 @@ They pass through the same ingest and validation as the other CSVs, but any bad 
 | `gym_floor` | `gym_supervisor` | 25 | 1 |
 | `group_fitness` | `group_fitness` | 30 | 1 |
 
+`participants_per_staff` must be a whole number greater than 0, and `minimum_staff` a whole number of 0 or more. Any other value, including a blank, zero or negative ratio, is a fatal reference-data error, so the required-staff calculation can never divide by zero.
+
 How these rules are applied is set out in 4.6.
 
 ### 4.4 Deliberate bad data and how each case is handled
@@ -165,7 +167,7 @@ The tool must never crash with a Python traceback on bad input. Any unexpected e
 ### 4.6 How understaffing is calculated
 
 - **Required staff** for a session and role = `max(minimum_staff, ceil(attendance / participants_per_staff))`.
-- **Who counts.** A staff member counts towards a session when a single shift at the same centre, in the right role, fully covers the session's time window. Two back-to-back shifts that only cover it together do not count.
+- **Who counts.** A staff member counts towards a session when a single shift on the same date, at the same centre, in the right role, fully covers the session's time window. Two back-to-back shifts that only cover it together do not count.
 - **Distinct staff.** Staff present are counted by distinct `staff_id`, so overlapping shifts for one person never count them twice.
 - **Concurrent sessions.** Each session is assessed on its own. A staff member whose shift covers two sessions running at the same time counts towards both. This is a known simplification, stated in the report footer.
 - **Shortfall.** For each session, the sum over its roles of `max(0, required - present)`. A session is understaffed when its shortfall is greater than 0.
@@ -294,7 +296,7 @@ Defined in `models.py` as frozen dataclasses. Field names follow the CSV columns
 | `Shift` | `shift_id`, `centre_code`, `staff_id`, `staff_name` (`str \| None`), `role`, `shift_date`, `start_time`, `end_time`, `line_number` |
 | `Session` | `session_id`, `centre_code`, `activity`, `session_date`, `start_time`, `end_time`, `capacity`, `attendance`, `line_number` |
 | `StaffingRule` | `activity`, `role`, `participants_per_staff`, `minimum_staff` |
-| `Centre` | `code`, `name` |
+| `Centre` | `centre_code`, `centre_name` |
 | `Rejection` | `file_name`, `line_number`, `raw_text`, `reason` |
 | `RowWarning` | `file_name`, `line_number`, `raw_text`, `reason` |
 
