@@ -22,7 +22,8 @@ FICTIONAL_NOTE = "All data in this report is fictional."
 
 SAMPLE_SUMMARY = [
     "rosters.csv: 557 rows read, 9 rejected, 1 auto-fixed, 1 blank line skipped",
-    "sessions.csv: 289 rows read, 8 rejected, 2 auto-fixed, 1 blank line skipped",
+    "sessions.csv: 289 rows read, 8 rejected, 1 auto-fixed, 1 flagged, "
+    "1 blank line skipped",
     "Understaffed sessions: 43 of 281 (15%)",
     f"Report written to {REPORT_FILE}",
 ]
@@ -474,6 +475,50 @@ def test_db_file_that_cannot_be_removed_is_a_fatal_input_error(
     assert run_cli(*small_inputs, "--db-file", str(database_file)) == 2
 
     assert capsys.readouterr().err.strip() == f"Could not replace {database_file}"
+
+
+def test_summary_separates_auto_fixed_rows_from_flagged_rows(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rosters = clean_rosters(tmp_path)
+    sessions = write_csv(
+        tmp_path / "sessions.csv",
+        SESSION_COLUMNS,
+        " se-1 ,rbc,lap_swim,04/11/2026,07:00,08:00,40,10",
+        "SE-2,RBC,lap_swim,04/11/2026,09:00,10:00,40,45",
+    )
+
+    run_cli("--rosters", str(rosters), "--sessions", str(sessions))
+
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[1] == "sessions.csv: 2 rows read, 0 rejected, 1 auto-fixed, 1 flagged"
+
+
+def test_attendance_above_capacity_is_kept_as_written(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rosters = clean_rosters(tmp_path)
+    sessions = write_csv(
+        tmp_path / "sessions.csv",
+        SESSION_COLUMNS,
+        "SE-2,RBC,lap_swim,04/11/2026,09:00,10:00,40,45",
+    )
+    database_file = tmp_path / "roster_check.duckdb"
+
+    run_cli(
+        "--rosters",
+        str(rosters),
+        "--sessions",
+        str(sessions),
+        "--db-file",
+        str(database_file),
+    )
+
+    sessions_line = capsys.readouterr().out.splitlines()[1]
+    assert sessions_line == "sessions.csv: 1 row read, 0 rejected, 1 flagged"
+    with duckdb.connect(str(database_file), read_only=True) as connection:
+        stored = connection.execute("SELECT attendance FROM sessions").fetchall()
+    assert stored == [(45,)]
 
 
 def run_command(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:

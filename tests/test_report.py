@@ -390,15 +390,19 @@ def test_rejected_rows_are_listed_by_file_with_line_numbers() -> None:
     assert "2 rows were left out." in page
 
 
-def test_auto_fixed_rows_are_in_a_collapsed_list() -> None:
-    warning = RowWarning(
-        "sessions.csv", 9, " se-1 ,nth", "Cleaned spacing and capitals"
+def test_auto_fixed_and_flagged_rows_are_in_one_collapsed_list() -> None:
+    warnings = (
+        RowWarning("sessions.csv", 9, " se-1 ,nth", "Cleaned spacing and capitals"),
+        RowWarning(
+            "sessions.csv", 12, "SE-4,NTH", "Attendance is above capacity (31 of 24)"
+        ),
     )
 
-    page = render(data_files=[result(warnings=(warning,))])
+    page = render(data_files=[result(warnings=warnings)])
 
-    assert "<summary>Auto-fixed (1)</summary>" in page
+    assert "<summary>Auto-fixed or flagged (2)</summary>" in page
     assert "Cleaned spacing and capitals" in page
+    assert "Attendance is above capacity (31 of 24)" in page
 
 
 def test_raw_row_text_is_escaped() -> None:

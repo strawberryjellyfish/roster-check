@@ -26,6 +26,7 @@ from roster_check.models import CsvFile, InputError, ReportData, ValidationResul
 from roster_check.report import percent_text, render_report
 from roster_check.validate import (
     CENTRE_COLUMNS,
+    CLEANED_REASON,
     ROSTER_COLUMNS,
     SESSION_COLUMNS,
     STAFFING_RULE_COLUMNS,
@@ -317,14 +318,27 @@ def _data_file_line(data_file: DataFile) -> str:
     """Describe what happened to the rows of one data file."""
     csv_file = data_file.csv
     result = data_file.result
-    # A row can carry more than one warning, so count rows rather than warnings.
-    auto_fixed = len({warning.line_number for warning in result.warnings})
+    # Cleaning fixes a row; any other warning, such as attendance above
+    # capacity, only flags it. A row can carry both and is then counted in
+    # both, so rows are counted rather than warnings.
+    auto_fixed = {
+        warning.line_number
+        for warning in result.warnings
+        if warning.reason == CLEANED_REASON
+    }
+    flagged = {
+        warning.line_number
+        for warning in result.warnings
+        if warning.reason != CLEANED_REASON
+    }
     parts = [
         f"{_count(len(csv_file.rows), 'row', 'rows')} read",
         f"{len(result.rejected)} rejected",
     ]
     if auto_fixed:
-        parts.append(f"{auto_fixed} auto-fixed")
+        parts.append(f"{len(auto_fixed)} auto-fixed")
+    if flagged:
+        parts.append(f"{len(flagged)} flagged")
     if csv_file.blank_lines:
         parts.append(
             f"{_count(csv_file.blank_lines, 'blank line', 'blank lines')} skipped"
