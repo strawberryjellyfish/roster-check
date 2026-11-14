@@ -38,7 +38,13 @@ uv run roster-check --rosters my_rosters.csv --sessions my_sessions.csv --out re
 | `--debug` | Show the full traceback when something goes wrong. |
 | `--version` | Print the version and exit. |
 
-Exit codes: `0` success, `1` unexpected error or a `--strict` failure, `2` an input file that cannot be used (no report is written).
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success. |
+| `1` | An unexpected error, or `--strict` found rejected rows. |
+| `2` | An input or output problem: an input file that cannot be used (no report is written), an output folder that does not exist, a report or database file that cannot be written, or `--out` and `--db-file` naming the same file. |
 
 Run the tests and checks:
 

@@ -128,7 +128,7 @@ The sample CSVs contain about 20 bad rows spread across both files, so the "data
 Rows fall into three outcomes:
 
 - **Rejected:** the row is excluded and listed in the report with file, line number, the raw text, and a plain-English reason.
-- **Fixed with a warning:** the row is cleaned, used, and listed in a collapsible "auto-fixed" list.
+- **Fixed with a warning:** the row is cleaned, used, and listed in a collapsible "auto-fixed or flagged" list. Rows kept but flagged (case 8) appear in the same list.
 - **Fatal:** the whole file cannot be used. The tool prints a clear message and exits with code 2. No report is written.
 
 | # | Case | Example | Outcome | Reason shown to the user |
@@ -224,7 +224,7 @@ The exact text is fixed by tests. `{label}` is the plain-English column name, fo
 5. **When the gaps happen.** Heatmap of day of week (rows) by hour of day (columns), cell shade showing the staff shortfall in five fixed levels (0, 1, 2 to 3, 4 to 6, 7 or more), with the number shown in every cell that has a shortfall. Hours with no sessions are drawn as empty cells. Each session is placed in the hour it starts, and a cell's value is the total shortfall of the sessions starting in that day and hour. Cells fade in. Hovering a cell shows the exact numbers (native SVG `<title>` tooltip, no library).
 6. **Attendance versus staffing over time.** Two aligned line panels sharing the date axis: total attendance above, total staff hours below, each with its own axis starting at zero. Days are placed by date. Lines draw themselves on load using the SVG stroke-dash technique.
 7. **Worst ten understaffed sessions.** A table: date, centre, activity, time, attendance, and the shortfall in plain words ("Needs 3 swim instructors, had 1"). Shortfall shown with a small inline bar. Ranked by shortfall (highest first), then attendance (highest first), then date, start time and session ID, so ties always appear in the same order.
-8. **Data problems.** Grouped by file. A table of rejected rows with line number, reason, and the raw row text in monospace so the user can find and fix it in their spreadsheet. A collapsible "auto-fixed" list beneath. If there are no problems, a short green "All rows were usable" message.
+8. **Data problems.** Grouped by file. A table of rejected rows with line number, reason, and the raw row text in monospace so the user can find and fix it in their spreadsheet. A collapsible "auto-fixed or flagged" list beneath. If there are no problems, a short green "All rows were usable" message.
 9. **Footer.** How the numbers were calculated (one short paragraph plus the staffing rules table, including the concurrent-sessions simplification from 4.6), tool version, and, when the bundled sample data was used, "All data in this report is fictional."
 
 ### 5.3 How the visuals are built
@@ -314,7 +314,7 @@ roster-check/
 |---|---|---|---|
 | `ingest` | file path | header plus list of `(line_number, raw_text, fields)` | Handles BOM, line endings, blank lines. Raises `InputError` for fatal cases. |
 | `validate` | raw rows, known centres, rules | `ValidationResult(valid, rejected, warnings)` | Pure functions, no I/O. One parser per field type. |
-| `db` | valid rows, rejections, centres, rules | DuckDB connection with `shifts`, `sessions`, `rules`, `centres`, `rejections` tables and the analysis views | Uses explicit column types. Reads SQL files via `importlib.resources`. |
+| `db` | valid rows, rejections, centres, rules, optionally an open connection | DuckDB connection with `shifts`, `sessions`, `rules`, `centres`, `rejections` tables and the analysis views | Uses explicit column types. Reads SQL files via `importlib.resources`. |
 | `analysis` | connection | `ReportData` dataclass | All numbers the report needs, nothing else. |
 | `charts` | `ReportData` parts (`CentreSummary`, `HeatmapCell`, `DailyTotal`) and plain numbers | SVG strings | No DuckDB, no Jinja. No colours or animation in the SVG: CSS classes only. |
 | `summarise` | `ReportData` | `str` or `None` | Sends aggregates only. Returns `None` on any failure. |
@@ -515,9 +515,11 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D29 | Print uses two A4 landscape pages: the analysis, then data problems and method. | Seventeen problem rows with their raw text cannot share one page with the charts at a readable size. | 5.1 |
 | D30 | An existing report is replaced without asking. An existing `--db-file` is replaced only after the inputs pass validation. | Repeat runs behave like the first run, and a run that stops on bad input never deletes a saved database. | 6.3 |
 | D31 | A fatal input error exits with code 2 even with `--strict`. | The run stops before any rows are checked, so there is nothing for `--strict` to judge. | 6.3 |
-| D32 | When `--open` cannot start a browser, the tool prints where the report is and exits with code 0. | The report was written, which is the job; headless machines and CI have no browser. | 6.3 |
-| D33 | The terminal summary has one line per data file (rows read, rejected, auto-fixed, blank lines skipped), a note per file read as Windows-1252 or with ignored columns, then the understaffed count and the report path. An output folder that does not exist, or a report that cannot be written, is a fatal input error. | Shows where the problems are without opening the report. Output paths are user input, handled like input paths. | 6.3, 4.5 |
+| D32 | When `--open` cannot start a browser, the tool prints where the report is. That alone does not change the exit code: it stays 0 unless something else, such as a `--strict` failure, sets it. | The report was written, which is the job; headless machines and CI have no browser. | 6.3 |
+| D33 | The terminal summary has one line per data file (rows read, rejected, auto-fixed, flagged, blank lines skipped), a note per file read as Windows-1252 or with ignored columns, then the understaffed count and the report path. An output folder that does not exist, a report or database file that cannot be written, or `--out` and `--db-file` resolving to the same file, exits with code 2. | Shows where the problems are without opening the report. Output paths are user input, handled like input paths. | 6.3, 4.5 |
 | D34 | `--summarise` is accepted from M6 and prints "Skipping AI summary: not available in this version" until M7. `--db-file` is built in M6. The preview script is removed now that the command writes the report. | The command line is complete in M6 as 6.3 lists it; M7 only replaces the stub. | 6.3, 9 |
+| D35 | Rows changed by cleaning count as auto-fixed; rows with any other warning, such as attendance above capacity, count as flagged. The report lists both in one collapsed "Auto-fixed or flagged" list. | Case 8 is kept and flagged, not fixed, so calling it auto-fixed would be wrong. | 4.4, 5.2 |
+| D36 | `db` loads into a connection it is given and opens an in-memory one otherwise; `cli` opens the file-backed connection for `--db-file`. | Keeps writing files in `cli`, as the module contracts require. | 6.2 |
 
 ### Still open
 
