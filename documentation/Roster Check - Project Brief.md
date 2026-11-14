@@ -62,7 +62,9 @@ All data is invented. Staff names come from a fixed list of obviously fictional 
 
 The sample data covers **4 centres over 2 weeks** (roughly 250 sessions and 400 shifts), which is enough to make the charts interesting but small enough to read.
 
-Centres: `RBC` Riverbend Central, `NTH` Northgate, `HLS` Hillside, `LKV` Lakeview.
+Centres: `RBC` Riverbend Central, `NTH` Northgate, `HLS` Hillside, `LKV` Lakeview. These are held as reference data in `centres.csv` (see 4.3).
+
+The organisation is Australian, so dates in the CSV files are normally written `DD/MM/YYYY`, as an Australian Excel export would produce. Accepted formats are set out in 4.5.
 
 ### 4.1 `rosters.csv`: who was rostered on
 
@@ -73,8 +75,8 @@ Centres: `RBC` Riverbend Central, `NTH` Northgate, `HLS` Hillside, `LKV` Lakevie
 | `staff_id` | text | `S-017` | Required |
 | `staff_name` | text | `Jordan Placeholder` | Optional, never sent to the AI |
 | `role` | text | `lifeguard` | Required, one of `lifeguard`, `swim_instructor`, `gym_supervisor`, `group_fitness`, `front_desk` |
-| `shift_date` | date | `2026-11-03` | Required |
-| `start_time` | time | `06:00` | Required, `HH:MM` 24-hour |
+| `shift_date` | date | `03/11/2026` | Required, format as in 4.5 |
+| `start_time` | time | `06:00` | Required, 24-hour, format as in 4.5 |
 | `end_time` | time | `10:30` | Required, after `start_time` |
 
 ### 4.2 `sessions.csv`: what was running and who came
@@ -84,15 +86,28 @@ Centres: `RBC` Riverbend Central, `NTH` Northgate, `HLS` Hillside, `LKV` Lakevie
 | `session_id` | text | `SE-00131` | Required, unique |
 | `centre_code` | text | `NTH` | Required, must be a known centre |
 | `activity` | text | `swim_lesson` | Required, must exist in the staffing rules |
-| `session_date` | date | `2026-11-04` | Required |
-| `start_time` | time | `16:00` | Required |
+| `session_date` | date | `04/11/2026` | Required, format as in 4.5 |
+| `start_time` | time | `16:00` | Required, 24-hour, format as in 4.5 |
 | `end_time` | time | `16:45` | Required, after `start_time` |
 | `capacity` | integer | `24` | Required, greater than 0 |
 | `attendance` | integer | `19` | Required, 0 or more |
 
-### 4.3 `staffing_rules.csv`: reference data (version-controlled, not user input)
+### 4.3 Reference data: `staffing_rules.csv` and `centres.csv`
 
-This small file says how many of which role each activity needs. Keeping it as data rather than code means the SQL stays generic and a manager could change a ratio without touching Python.
+These two small files are version-controlled reference data. Keeping them as data rather than code means the SQL stays generic and a manager could change a ratio or add a centre without touching Python.
+
+They pass through the same ingest and validation as the other CSVs, but any bad row in either file is fatal (exit code 2), with a message naming the file, line and problem. Reference data must be fully correct before any analysis can be trusted.
+
+`centres.csv` lists the known centres:
+
+| `centre_code` | `centre_name` |
+|---|---|
+| `RBC` | Riverbend Central |
+| `NTH` | Northgate |
+| `HLS` | Hillside |
+| `LKV` | Lakeview |
+
+`staffing_rules.csv` says how many of which role each activity needs:
 
 | `activity` | `role` | `participants_per_staff` | `minimum_staff` |
 |---|---|---|---|
@@ -102,7 +117,7 @@ This small file says how many of which role each activity needs. Keeping it as d
 | `gym_floor` | `gym_supervisor` | 25 | 1 |
 | `group_fitness` | `group_fitness` | 30 | 1 |
 
-Required staff for a session and role = `max(minimum_staff, ceil(attendance / participants_per_staff))`. A rostered staff member counts towards a session when their shift at the same centre, in the right role, fully covers the session's time window.
+How these rules are applied is set out in 4.6.
 
 ### 4.4 Deliberate bad data and how each case is handled
 
@@ -118,7 +133,7 @@ Rows fall into three outcomes:
 |---|---|---|---|---|
 | 1 | Required field blank | `staff_id` is empty | Rejected | "Missing staff ID" |
 | 2 | Impossible date | `2026-02-30` | Rejected | "Date 2026-02-30 does not exist" |
-| 3 | Australian date format | `04/11/2026` | Fixed with warning | "Date converted from DD/MM/YYYY" |
+| 3 | Two-digit year | `04/11/26` | Rejected | "Could not read session date '04/11/26'" |
 | 4 | Unreadable date or time | `next tues`, `25:00` | Rejected | "Could not read start time '25:00'" |
 | 5 | End before start | `start 14:00, end 09:00` | Rejected | "Shift ends before it starts" |
 | 6 | Non-numeric number | `attendance = twelve` | Rejected | "Attendance 'twelve' is not a number" |
@@ -137,6 +152,25 @@ Rows fall into three outcomes:
 
 The tool must never crash with a Python traceback on bad input. Any unexpected error is caught at the top level, reported in one line, and exits with code 1. `--debug` shows the traceback.
 
+### 4.5 Validation and cleaning rules
+
+- **Dates.** `DD/MM/YYYY` (single-digit day or month allowed) and `YYYY-MM-DD` are both normal formats and are accepted without a warning. US-style `MM/DD/YYYY` is never assumed: `11/30/2026` is rejected as a date that does not exist (case 2). Two-digit years are rejected (case 3).
+- **Times.** `HH:MM`, `H:MM` and `HH:MM:00` are accepted without a warning. Anything else is rejected, including `24:00`. Shifts and sessions never cross midnight.
+- **Cleaning (case 13).** Every field has surrounding spaces removed. Centre codes and IDs are converted to upper case; roles and activities to lower case. Staff names are only trimmed. A row changed by cleaning gets one "Cleaned spacing and capitals" warning.
+- **Several problems in one row.** Only the first problem is reported, checking columns from left to right, so each rejected row has one clear reason.
+- **Duplicate IDs (case 11).** The first row with an ID claims it, even if that row is rejected for another reason. Later rows with the same ID are rejected.
+- **Headers.** Column names are matched ignoring case and surrounding spaces, and columns may appear in any order. Extra columns are ignored and noted once in the terminal summary. The column count check (case 12) compares each row with the header.
+- **Encoding.** Files are read as UTF-8, with or without a byte-order mark. If that fails, the file is read as Windows-1252 and a one-line note is added to the terminal summary.
+
+### 4.6 How understaffing is calculated
+
+- **Required staff** for a session and role = `max(minimum_staff, ceil(attendance / participants_per_staff))`.
+- **Who counts.** A staff member counts towards a session when a single shift at the same centre, in the right role, fully covers the session's time window. Two back-to-back shifts that only cover it together do not count.
+- **Distinct staff.** Staff present are counted by distinct `staff_id`, so overlapping shifts for one person never count them twice.
+- **Concurrent sessions.** Each session is assessed on its own. A staff member whose shift covers two sessions running at the same time counts towards both. This is a known simplification, stated in the report footer.
+- **Shortfall.** For each session, the sum over its roles of `max(0, required - present)`. A session is understaffed when its shortfall is greater than 0.
+- **Staff hours** count every valid shift in every role, including `front_desk`.
+
 ## 5. The HTML report
 
 ### 5.1 Principles
@@ -146,6 +180,7 @@ The tool must never crash with a Python traceback on bad input. Any unexpected e
 - **Appealing but calm.** A clean card layout, a restrained palette with one accent colour, good typography from the system font stack, and light and dark mode via `prefers-color-scheme`.
 - **Animated where it helps.** Animations make the report feel alive on first open but never hide information.
 - **Accessible.** Every chart has a text alternative and a visible data table nearby. Colour is never the only signal. `prefers-reduced-motion` turns all animation off.
+- **Australian dates.** Dates are shown with the month spelled out, for example "Tue 4 Nov 2026", so they cannot be misread whichever date convention the reader is used to.
 
 ### 5.2 Sections, top to bottom
 
@@ -153,11 +188,11 @@ The tool must never crash with a Python traceback on bad input. Any unexpected e
 2. **Headline numbers (KPI tiles).** Sessions analysed; understaffed sessions (count and percent); total staff hours rostered; total attendance; rows rejected. Numbers count up from zero on load.
 3. **Summary.** If `--summarise` ran, Claude's 3 to 5 sentence summary in a highlighted panel, labelled as AI-generated. Otherwise a short rule-based summary built from the numbers, so the report never looks empty.
 4. **Understaffed sessions by centre.** Horizontal bar chart, one bar per centre, bars grow in on load with a slight stagger. Shows both the count and the percentage of that centre's sessions.
-5. **When the gaps happen.** Heatmap of day of week (rows) by hour of day (columns), cell shade showing the staff shortfall. Cells fade in. Hovering a cell shows the exact numbers (native SVG `<title>` tooltip, no library).
+5. **When the gaps happen.** Heatmap of day of week (rows) by hour of day (columns), cell shade showing the staff shortfall. Each session is placed in the hour it starts, and a cell's value is the total shortfall of the sessions starting in that day and hour. Cells fade in. Hovering a cell shows the exact numbers (native SVG `<title>` tooltip, no library).
 6. **Attendance versus staffing over time.** Daily line chart with two lines (total attendance, and total staff hours scaled to a second axis or shown as bars). Lines draw themselves on load using the SVG stroke-dash technique.
-7. **Worst ten understaffed sessions.** A table: date, centre, activity, time, attendance, and the shortfall in plain words ("Needs 3 swim instructors, had 1"). Shortfall shown with a small inline bar.
+7. **Worst ten understaffed sessions.** A table: date, centre, activity, time, attendance, and the shortfall in plain words ("Needs 3 swim instructors, had 1"). Shortfall shown with a small inline bar. Ranked by shortfall (highest first), then attendance (highest first), then date, start time and session ID, so ties always appear in the same order.
 8. **Data problems.** Grouped by file. A table of rejected rows with line number, reason, and the raw row text in monospace so the user can find and fix it in their spreadsheet. A collapsible "auto-fixed" list beneath. If there are no problems, a short green "All rows were usable" message.
-9. **Footer.** How the numbers were calculated (one short paragraph plus the staffing rules table), tool version, and "All data in this report is fictional."
+9. **Footer.** How the numbers were calculated (one short paragraph plus the staffing rules table, including the concurrent-sessions simplification from 4.6), tool version, and "All data in this report is fictional."
 
 ### 5.3 How the visuals are built
 
@@ -194,7 +229,8 @@ roster-check/
 ├── data/
 │   ├── sample/rosters.csv
 │   ├── sample/sessions.csv
-│   └── staffing_rules.csv
+│   ├── staffing_rules.csv
+│   └── centres.csv
 ├── scripts/
 │   └── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
 ├── dashboard/                    # STRETCH (M9): optional Evidence.dev project, needs Node
@@ -205,7 +241,7 @@ roster-check/
 │   ├── __init__.py               # __version__, read from installed package metadata
 │   ├── __main__.py               # python -m roster_check
 │   ├── cli.py                    # argparse, exit codes, top-level error handling
-│   ├── models.py                 # dataclasses: Shift, Session, Rule, Rejection, Warning
+│   ├── models.py                 # dataclasses: see 6.2.1
 │   ├── ingest.py                 # read raw CSV text, keep line numbers, header checks
 │   ├── validate.py               # per-field parsers and row rules -> (valid, rejected, warnings)
 │   ├── db.py                     # DuckDB connection, load tables, run a .sql file
@@ -248,6 +284,21 @@ roster-check/
 | `summarise` | `ReportData` | `str` or `None` | Sends aggregates only. Returns `None` on any failure. |
 | `report` | `ReportData`, charts, rejections, summary | HTML string | Writing to disk happens in `cli`. |
 | `cli` | argv | exit code | The only module that prints or touches the filesystem for output. |
+
+### 6.2.1 Data structures
+
+Defined in `models.py` as frozen dataclasses. Field names follow the CSV columns in section 4; dates and times are `datetime.date` and `datetime.time` values.
+
+| Dataclass | Fields |
+|---|---|
+| `Shift` | `shift_id`, `centre_code`, `staff_id`, `staff_name` (`str \| None`), `role`, `shift_date`, `start_time`, `end_time`, `line_number` |
+| `Session` | `session_id`, `centre_code`, `activity`, `session_date`, `start_time`, `end_time`, `capacity`, `attendance`, `line_number` |
+| `StaffingRule` | `activity`, `role`, `participants_per_staff`, `minimum_staff` |
+| `Centre` | `code`, `name` |
+| `Rejection` | `file_name`, `line_number`, `raw_text`, `reason` |
+| `RowWarning` | `file_name`, `line_number`, `raw_text`, `reason` |
+
+`RowWarning` is named to avoid clashing with Python's built-in `Warning` class. `ReportData` is defined at the start of M3, when the analysis outputs are built, and confirmed before use.
 
 ### 6.3 Command line
 
@@ -326,7 +377,7 @@ Each milestone is one branch and one pull request. Milestones are built in order
 | # | Milestone | Done when | Phase |
 |---|---|---|---|
 | M0 | **Project skeleton.** `pyproject.toml`, `uv.lock`, `LICENSE` (MIT), `src/` layout, ruff, pytest, CI workflow, `CLAUDE.md`, `.coderabbit.yaml`, PR template, a `roster-check --version` command with a test. | CI green on all five matrix jobs. | 1 |
-| M1 | **Sample data.** `staffing_rules.csv`, seeded generator script, committed sample CSVs including every bad-data case in 4.4, a test that the generator is deterministic. | Sample files committed and documented in the README. | 1 |
+| M1 | **Sample data.** `staffing_rules.csv`, `centres.csv`, seeded generator script, committed sample CSVs including every bad-data case in 4.4, a test that the generator is deterministic. | Sample files committed and documented in the README. | 1 |
 | M2 | **Ingest and validation.** `models.py`, `ingest.py`, `validate.py` with every case in 4.4 tested. | Each bad-data case has a passing test with its exact message. | 1 |
 | M3 | **DuckDB and SQL analysis.** `db.py`, the four SQL files, `analysis.py` returning `ReportData`, SQL tests with known answers, golden numbers for the sample data. | Correct understaffing results on fixtures and sample data. | 1 |
 | M4 | **Charts.** Bar chart, heatmap, line chart and inline shortfall bars as SVG, with tests. | Charts render and are tested; a preview HTML shows them. | 1 |
@@ -365,3 +416,32 @@ To keep this finished and reliable, v1 does not include: a web server or dashboa
 - The report is one self-contained file with no external requests, animated charts, a readable data problems section, and sensible print and reduced-motion behaviour.
 - Every change reached `main` through a reviewed pull request.
 - The README explains the project to a non-technical reader in the first screen.
+
+## 12. Decision log
+
+Decisions made after the first draft of this brief, before sample data and validation were built. Each is applied in the section shown, which is the authoritative wording.
+
+| # | Decision | Reason | Section |
+|---|---|---|---|
+| D1 | Data structures defined as frozen dataclasses; `Warning` renamed `RowWarning`. `ReportData` deferred to the start of M3. | Code is written against agreed structures, not guesses. Avoids shadowing a Python built-in. | 6.2.1 |
+| D2 | Known centres held in `centres.csv`. | Keeps reference data as data, like the staffing rules, and supplies centre names for the report. | 4.3 |
+| D3 | A bad row in either reference file is fatal. | Analysis cannot be trusted if the rules or centres are wrong. | 4.3 |
+| D4 | Only the first problem in a row is reported. | One clear, testable reason per row. | 4.5 |
+| D5 | The first row with an ID claims it, even if rejected. | Nothing is silently kept in place of a bad row. | 4.5 |
+| D6 | `DD/MM/YYYY` and `YYYY-MM-DD` are both normal date formats; US-style dates are never assumed; two-digit years are rejected. Report dates spell out the month. | The organisation is Australian and its exports use Australian dates. | 4.5, 5.1 |
+| D7 | Cleaning trims all fields and normalises the case of codes, IDs, roles and activities. | Predictable matching against reference data without losing rows to formatting. | 4.5 |
+| D8 | Headers matched ignoring case, spacing and order; extra columns ignored; UTF-8 with Windows-1252 fallback. | Tolerates common spreadsheet exports without guessing at content. | 4.5 |
+| D9 | Each session is assessed on its own; concurrent sessions can share a staff member. | Keeps the SQL simple and close to real pool supervision practice. Stated in the report. | 4.6 |
+| D10 | A single shift must fully cover a session. | Simple, testable rule; split shifts are rare. | 4.6 |
+| D11 | Staff present are counted by distinct staff ID. | Overlapping shifts cannot double count one person. | 4.6 |
+| D12 | Shortfall is summed across roles; the worst ten are ranked with a fixed tie-break order. | Deterministic results for tests and readers. | 4.6, 5.2 |
+| D13 | Staff hours include every role. | "Rostered hours" means all rostered hours. | 4.6 |
+| D14 | Heatmap places each session in its starting hour. | Every session appears exactly once. | 5.2 |
+
+### Still open
+
+These are decided at the start of the milestone that needs them:
+
+- The line chart's layout (5.2 item 6): second axis, bars, or two aligned charts. Before M4.
+- The wording of the rule-based summary and the Claude prompt (5.2 item 3, 6.4). Before M5 and M7.
+- CLI edge cases: overwriting an existing report, which exit code wins when `--strict` and a fatal error both apply, and `--open` when no browser is available. Before M6.
