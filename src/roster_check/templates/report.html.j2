@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ organisation }} staffing report{% if period %}: {{ period }}{% endif %}</title>
+<style>
+{% include "report.css" %}
+</style>
+</head>
+<body>
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Staffing report</p>
+    <h1>{{ organisation }}</h1>
+    <p class="meta">
+      {% if period %}{{ period }}{% else %}No sessions in the data{% endif %}
+      <span aria-hidden="true">&middot;</span>
+      Generated {{ generated }}
+    </p>
+  </div>
+  {% if all_rows_used %}
+  <p class="badge badge-good">{{ badge }}</p>
+  {% else %}
+  <a class="badge badge-warn" href="#data-problems">{{ badge }}</a>
+  {% endif %}
+</header>
+
+<main>
+  {% for name in empty_files %}
+  <p class="banner" role="alert">No usable rows in {{ name }}</p>
+  {% endfor %}
+
+  <section aria-labelledby="kpi-heading">
+    <h2 id="kpi-heading" class="visually-hidden">Headline numbers</h2>
+    <ul class="kpis">
+      {% for tile in kpis %}
+      <li class="kpi">
+        <span class="kpi-label">{{ tile.label }}</span>
+        <span class="kpi-value" data-value="{{ tile.value }}" data-decimals="{{ tile.decimals }}">{{ tile.text }}</span>
+        {% if tile.detail %}<span class="kpi-detail">{{ tile.detail }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card summary" aria-labelledby="summary-heading">
+    <h2 id="summary-heading">Summary</h2>
+    <p>{{ summary | join(" ") }}</p>
+  </section>
+
+  <section class="card animate" aria-labelledby="centres-heading">
+    <h2 id="centres-heading">Understaffed sessions by centre</h2>
+    {{ centre_chart }}
+    <details>
+      <summary>Show the numbers</summary>
+      <table>
+        <thead><tr><th scope="col">Centre</th><th scope="col" class="number">Sessions</th><th scope="col" class="number">Understaffed</th><th scope="col" class="number">Share</th></tr></thead>
+        <tbody>
+          {% for name, sessions, understaffed, share in centres %}
+          <tr><td>{{ name }}</td><td class="number">{{ sessions }}</td><td class="number">{{ understaffed }}</td><td class="number">{{ share }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  </section>
+
+  <section class="card animate" aria-labelledby="heatmap-heading">
+    <h2 id="heatmap-heading">When the gaps happen</h2>
+    <p class="caption">Total staff shortfall by day of the week and the hour sessions start. Hover over a cell for its exact numbers.</p>
+    {{ heatmap_chart }}
+    <details>
+      <summary>Show the numbers</summary>
+      <table>
+        <thead><tr><th scope="col">Day</th><th scope="col">Starting hour</th><th scope="col" class="number">Sessions</th><th scope="col" class="number">Understaffed</th><th scope="col" class="number">Shortfall</th></tr></thead>
+        <tbody>
+          {% for day, hour, sessions, understaffed, shortfall in heatmap_cells %}
+          <tr><td>{{ day }}</td><td>{{ hour }}</td><td class="number">{{ sessions }}</td><td class="number">{{ understaffed }}</td><td class="number">{{ shortfall }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  </section>
+
+  <section class="card animate" aria-labelledby="daily-heading">
+    <h2 id="daily-heading">Attendance and staffing over time</h2>
+    {{ daily_chart }}
+    <details>
+      <summary>Show the numbers</summary>
+      <table>
+        <thead><tr><th scope="col">Day</th><th scope="col" class="number">Attendance</th><th scope="col" class="number">Staff hours</th></tr></thead>
+        <tbody>
+          {% for day, attendance, hours in daily %}
+          <tr><td>{{ day }}</td><td class="number">{{ attendance }}</td><td class="number">{{ hours }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  </section>
+
+  <section class="card animate" aria-labelledby="worst-heading">
+    <h2 id="worst-heading">Worst understaffed sessions</h2>
+    {% if worst_sessions %}
+    <div class="table-scroll">
+      <table class="worst">
+        <thead><tr><th scope="col">Date</th><th scope="col">Centre</th><th scope="col">Activity</th><th scope="col">Time</th><th scope="col" class="number">Attendance</th><th scope="col">Shortfall</th></tr></thead>
+        <tbody>
+          {% for row in worst_sessions %}
+          <tr>
+            <td>{{ row.date }}</td>
+            <td>{{ row.centre }}</td>
+            <td>{{ row.activity }}</td>
+            <td class="nowrap">{{ row.time }}</td>
+            <td class="number">{{ row.attendance }}</td>
+            <td><span class="shortfall">{{ row.bar }}<span>{{ row.shortfall }}</span></span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="all-clear">No sessions were understaffed.</p>
+    {% endif %}
+  </section>
+
+  <section class="card" id="data-problems" aria-labelledby="problems-heading">
+    <h2 id="problems-heading">Data problems</h2>
+    {% if all_rows_used %}
+    <p class="all-clear">All rows were usable.</p>
+    {% endif %}
+    {% for file in problem_files %}
+    <h3>{{ file.name }}</h3>
+    {% if file.rejected %}
+    <p>{{ file.rejected | length }} {{ "row was" if file.rejected | length == 1 else "rows were" }} left out. Fix them in the spreadsheet and run the report again.</p>
+    <div class="table-scroll">
+      <table class="problems">
+        <thead><tr><th scope="col" class="number">Line</th><th scope="col">Reason</th><th scope="col">Row as written</th></tr></thead>
+        <tbody>
+          {% for row in file.rejected %}
+          <tr><td class="number">{{ row.line_number }}</td><td>{{ row.reason }}</td><td><code>{{ row.raw_text }}</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% if file.warnings %}
+    <details>
+      <summary>Auto-fixed ({{ file.warnings | length }})</summary>
+      <div class="table-scroll">
+        <table class="problems">
+          <thead><tr><th scope="col" class="number">Line</th><th scope="col">What happened</th><th scope="col">Row as written</th></tr></thead>
+          <tbody>
+            {% for row in file.warnings %}
+            <tr><td class="number">{{ row.line_number }}</td><td>{{ row.reason }}</td><td><code>{{ row.raw_text }}</code></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
+    {% endfor %}
+  </section>
+</main>
+
+<footer class="page-footer">
+  <h2>How the numbers were calculated</h2>
+  <p>For each session and role, the staff required is the larger of the rule's minimum and the attendance divided by participants per staff member, rounded up. A staff member counts as present when a single shift at the same centre, in that role, covers the whole session. A session is understaffed when any role has fewer staff present than required. Sessions running at the same time are assessed separately, so one staff member can count towards both.</p>
+  <table class="rules">
+    <thead><tr><th scope="col">Activity</th><th scope="col">Role</th><th scope="col" class="number">Participants per staff member</th><th scope="col" class="number">Minimum staff</th></tr></thead>
+    <tbody>
+      {% for activity, role, participants, minimum in staffing_rules %}
+      <tr><td>{{ activity }}</td><td>{{ role }}</td><td class="number">{{ participants }}</td><td class="number">{{ minimum }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="meta">Roster Check {{ version }}{% if sample_data %} &middot; All data in this report is fictional.{% endif %}</p>
+</footer>
+<script>
+{% include "report.js" %}
+</script>
+</body>
+</html>

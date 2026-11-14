@@ -1,0 +1,294 @@
+/* Roster Check report styles. Every colour is a custom property, with
+   overrides for dark mode. Charts carry classes only; their look is set here. */
+
+:root {
+  --page: #f5f6f8;
+  --card: #ffffff;
+  --text: #1d2733;
+  --muted: #5b6878;
+  --rule: #e2e6eb;
+  --accent: #2563a6;
+  --accent-soft: #e7eff8;
+  --good: #1f7a4d;
+  --good-soft: #e3f3ea;
+  --warn: #9a5b00;
+  --warn-soft: #fdf0d9;
+  --cell-empty: #f0f2f5;
+  --shade-0: #e4edf6;
+  --shade-1: #fbe3bd;
+  --shade-2: #f5bb76;
+  --shade-3: #e2843f;
+  --shade-4: #b54a1c;
+  --shade-text-strong: #ffffff;
+  --radius: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #12161c;
+    --card: #1b2129;
+    --text: #e6eaef;
+    --muted: #9aa6b4;
+    --rule: #2c3540;
+    --accent: #6ea8e8;
+    --accent-soft: #1d2e42;
+    --good: #6fcf9b;
+    --good-soft: #17301f;
+    --warn: #f2b45a;
+    --warn-soft: #36290f;
+    --cell-empty: #222a33;
+    --shade-0: #243446;
+    --shade-1: #5a4320;
+    --shade-2: #8a5a22;
+    --shade-3: #c06a2a;
+    --shade-4: #e88a4a;
+    --shade-text-strong: #12161c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.page-header, main, .page-footer {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-top: 40px;
+  padding-bottom: 24px;
+}
+
+h1 { margin: 0; font-size: 2rem; line-height: 1.2; }
+h2 { margin: 0 0 12px; font-size: 1.2rem; }
+h3 { margin: 24px 0 8px; font-size: 1rem; }
+p { margin: 0 0 12px; }
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.meta, .caption { color: var(--muted); font-size: 0.9rem; }
+.meta { margin: 6px 0 0; }
+
+.badge {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.badge-good { background: var(--good-soft); color: var(--good); }
+.badge-warn { background: var(--warn-soft); color: var(--warn); }
+.badge-warn::before { content: "! "; }
+.badge-good::before { content: "\2713  "; }
+
+.banner {
+  padding: 12px 16px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--rule);
+}
+.kpi-label { color: var(--muted); font-size: 0.85rem; }
+.kpi-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-detail { color: var(--muted); font-size: 0.85rem; }
+
+.card {
+  margin-bottom: 24px;
+  padding: 24px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--rule);
+}
+
+.summary {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+}
+.summary p { margin: 0; font-size: 1.05rem; }
+
+.all-clear { color: var(--good); font-weight: 600; }
+
+details { margin-top: 12px; }
+summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+details table { margin-top: 8px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th, td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+th { color: var(--muted); font-weight: 600; }
+.number { text-align: right; font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
+.table-scroll { overflow-x: auto; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.shortfall { display: inline-flex; gap: 10px; align-items: center; }
+
+.page-footer { padding-bottom: 48px; color: var(--muted); font-size: 0.9rem; }
+.page-footer h2 { color: var(--text); font-size: 1rem; }
+.page-footer table { margin: 12px 0 16px; max-width: 640px; }
+
+/* Charts */
+
+.chart { display: block; width: 100%; height: auto; }
+.chart text { fill: var(--text); font-family: var(--font); font-size: 12px; }
+.chart .title { font-weight: 600; }
+.chart .axis, .chart .value { fill: var(--muted); }
+.chart .no-data { fill: var(--muted); font-size: 14px; }
+.chart .grid { stroke: var(--rule); }
+.chart .bar { fill: var(--accent); }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+.chart .point { fill: var(--accent); }
+.chart .cell rect, .chart rect.cell { stroke: var(--card); stroke-width: 2; }
+.chart rect.empty { fill: var(--cell-empty); }
+.chart .shade-0 rect { fill: var(--shade-0); }
+.chart .shade-1 rect { fill: var(--shade-1); }
+.chart .shade-2 rect { fill: var(--shade-2); }
+.chart .shade-3 rect { fill: var(--shade-3); }
+.chart .shade-4 rect { fill: var(--shade-4); }
+.chart .cell-value { font-weight: 600; }
+.chart .shade-3 .cell-value, .chart .shade-4 .cell-value { fill: var(--shade-text-strong); }
+
+.centre-bars { max-width: 760px; }
+.heatmap { max-width: 720px; }
+.daily { max-width: 760px; }
+.shortfall-bar { flex: none; width: 80px; }
+
+/* Animation. Elements end in their normal state, so nothing is hidden if an
+   animation never runs. With the script running, charts wait until they are
+   scrolled into view. */
+
+.chart .bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: grow 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+.chart .cell { animation: fade 0.5s ease-out both; animation-delay: var(--delay, 0s); }
+.chart .line { stroke-dasharray: 1; animation: draw 1.4s ease-out both; }
+.chart .point { animation: fade 0.4s ease-out 1.1s both; }
+
+.js .animate:not(.in-view) .chart * { animation-play-state: paused; }
+
+@keyframes grow { from { transform: scaleX(0); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes draw { from { stroke-dashoffset: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Print: A4 landscape, data problems on a new page, details stay closed. */
+
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  :root {
+    --page: #ffffff;
+    --card: #ffffff;
+    --text: #000000;
+    --muted: #444444;
+  }
+  *, *::before, *::after { animation: none !important; }
+  html, body { font-size: 7.5pt; line-height: 1.35; }
+  .page-header, main, .page-footer { max-width: none; padding: 0; }
+  .page-header { padding: 0 0 8px; }
+  h1 { font-size: 16pt; }
+  h2 { font-size: 11pt; margin-bottom: 4px; }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+  }
+  main > section:first-of-type, .summary, #data-problems { grid-column: 1 / -1; }
+  #data-problems { break-before: page; }
+  .worst td, .worst th { white-space: nowrap; }
+  .problems code { font-size: 7pt; }
+  h3 { margin: 6px 0 2px; }
+  .card p { margin-bottom: 4px; }
+  .banner { grid-column: 1 / -1; }
+  .kpis { grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0; }
+  .kpi { padding: 6px 10px; }
+  .kpi-value { font-size: 14pt; }
+  .card { margin: 0; padding: 8px 10px; break-inside: avoid; }
+  details { display: none; }
+  .centre-bars { height: 28mm; width: auto; max-width: 100%; }
+  .heatmap, .daily { height: 44mm; width: auto; max-width: 100%; }
+  th, td { padding: 2px 6px; }
+  .page-footer { padding-top: 8px; font-size: 8pt; }
+  a { color: inherit; }
+}

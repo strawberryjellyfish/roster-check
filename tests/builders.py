@@ -1,12 +1,39 @@
-"""Builders for small hand-made records used by the database and analysis tests."""
+"""Builders for the records and databases used by the tests.
+
+Small hand-made records cover single rules; ``run_sample`` runs the bundled
+sample data through the pipeline for end-to-end checks.
+"""
 
 from collections.abc import Sequence
 from datetime import date, time
+from importlib.resources import files
+from pathlib import Path
+from typing import Any
 
 import duckdb
 
+from roster_check.analysis import analyse
 from roster_check.db import create_database
-from roster_check.models import Centre, Rejection, Session, Shift, StaffingRule
+from roster_check.ingest import read_csv
+from roster_check.models import (
+    Centre,
+    Rejection,
+    ReportData,
+    Session,
+    Shift,
+    StaffingRule,
+    ValidationResult,
+)
+from roster_check.validate import (
+    CENTRE_COLUMNS,
+    ROSTER_COLUMNS,
+    SESSION_COLUMNS,
+    STAFFING_RULE_COLUMNS,
+    validate_centres,
+    validate_sessions,
+    validate_shifts,
+    validate_staffing_rules,
+)
 
 WEDNESDAY = date(2026, 11, 4)
 
@@ -90,3 +117,37 @@ def build_database(
         sessions=sessions,
         rejections=rejections,
     )
+
+
+def run_sample() -> tuple[ReportData, list[ValidationResult[Any]]]:
+    """Run the bundled sample data through every stage up to analysis.
+
+    Returns:
+        The report figures and the validation results for the roster and
+        session files, in that order.
+    """
+    data = Path(str(files("roster_check").joinpath("data")))
+    centres = validate_centres(read_csv(data / "centres.csv", CENTRE_COLUMNS))
+    rules = validate_staffing_rules(
+        read_csv(data / "staffing_rules.csv", STAFFING_RULE_COLUMNS)
+    )
+    centre_codes = {centre.centre_code for centre in centres}
+    shifts = validate_shifts(
+        read_csv(data / "sample" / "rosters.csv", ROSTER_COLUMNS), centre_codes
+    )
+    sessions = validate_sessions(
+        read_csv(data / "sample" / "sessions.csv", SESSION_COLUMNS),
+        centre_codes,
+        {rule.activity for rule in rules},
+    )
+    connection = create_database(
+        centres=centres,
+        rules=rules,
+        shifts=shifts.valid,
+        sessions=sessions.valid,
+        rejections=shifts.rejected + sessions.rejected,
+    )
+    try:
+        return analyse(connection), [shifts, sessions]
+    finally:
+        connection.close()
