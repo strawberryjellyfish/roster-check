@@ -1,0 +1,58 @@
+[project]
+name = "roster-check"
+version = "0.1.0"
+description = "Checks recreation centre rosters against session attendance and reports understaffed sessions."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Robert Miller" }]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+roster-check = "roster_check.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "N",    # PEP 8 naming
+    "UP",   # modern Python syntax
+    "B",    # likely bugs
+    "SIM",  # simplifications
+    "S",    # security (bandit)
+    "D",    # docstrings
+    "RUF",  # ruff-specific rules
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use bare asserts and descriptive test names instead of docstrings.
+"tests/**" = ["S101", "D103"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
+
+[tool.coverage.run]
+source = ["roster_check"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.5",
+]

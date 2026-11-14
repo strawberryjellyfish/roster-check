@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-GB
+tone_instructions: "Plain, direct and informative. No emojis."
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "src/roster_check/**/*.py"
+      instructions: |
+        - Follow the rules in CLAUDE.md: type hints on every signature, Google-style
+          docstrings on modules and functions, modern Python 3.11+ syntax.
+        - Flag any new or changed behaviour that has no accompanying test.
+        - Flag SQL built by string formatting with data values; values must be bound
+          parameters. All SQL must live in .sql files under src/roster_check/sql/.
+        - Flag any staff name or staff ID passed to summarise.py or included in an
+          AI prompt. Only aggregated numbers may be sent.
+        - Only cli.py may print or write output files.
+        - Flag inconsistent style compared with the rest of the codebase.
+    - path: "src/roster_check/templates/**"
+      instructions: |
+        - Flag any network access in the report: external src or href resources,
+          @import, fetch calls or CDN links. The report must be fully self-contained.
+        - Flag content marked safe in Jinja2 that is not SVG produced by charts.py.
+    - path: "tests/**"
+      instructions: |
+        - Tests must not use the network, the real Anthropic API, or depend on the
+          current date, time zone or locale.
+    - path: "**/*.csv"
+      instructions: |
+        - All data must be fictional: no real names, emails, phone numbers or addresses.
