@@ -477,6 +477,41 @@ def test_db_file_that_cannot_be_removed_is_a_fatal_input_error(
     assert capsys.readouterr().err.strip() == f"Could not replace {database_file}"
 
 
+def test_db_file_that_cannot_be_created_is_a_fatal_input_error(
+    tmp_path: Path,
+    small_inputs: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    database_file = tmp_path / "roster_check.duckdb"
+
+    def failing_connect(database: str) -> duckdb.DuckDBPyConnection:
+        raise duckdb.IOException("cannot open file")
+
+    monkeypatch.setattr(duckdb, "connect", failing_connect)
+
+    assert run_cli(*small_inputs, "--db-file", str(database_file)) == 2
+
+    assert capsys.readouterr().err.strip() == f"Could not create {database_file}"
+
+
+@pytest.mark.parametrize("db_file_form", ["relative", "absolute"])
+def test_same_file_for_report_and_database_is_rejected_before_writing(
+    db_file_form: str,
+    tmp_path: Path,
+    small_inputs: list[str],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    shared = "shared.out"
+    db_file = shared if db_file_form == "relative" else str(tmp_path / shared)
+
+    assert run_cli(*small_inputs, "--out", shared, "--db-file", db_file) == 2
+
+    message = capsys.readouterr().err.strip()
+    assert message == "--out and --db-file must be different files"
+    assert not (tmp_path / shared).exists()
+
+
 def test_summary_separates_auto_fixed_rows_from_flagged_rows(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

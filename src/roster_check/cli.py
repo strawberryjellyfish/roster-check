@@ -18,6 +18,8 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+import duckdb
+
 from roster_check import __version__
 from roster_check.analysis import analyse
 from roster_check.db import create_database
@@ -194,6 +196,7 @@ def run(args: argparse.Namespace, generated_at: datetime) -> int:
     _check_output_folder(args.out)
     if args.db_file is not None:
         _check_output_folder(args.db_file)
+        _check_different_files(args.out, args.db_file)
 
     output = build_report(
         rosters_file=args.rosters or SAMPLE_ROSTERS_FILE,
@@ -261,15 +264,15 @@ def build_report(
         sessions_csv, centre_codes, {rule.activity for rule in rules}
     )
 
-    if database_file is not None:
-        _remove_database_file(database_file)
     connection = create_database(
         centres=centres,
         rules=rules,
         shifts=shifts.valid,
         sessions=sessions.valid,
         rejections=shifts.rejected + sessions.rejected,
-        database_file=database_file,
+        connection=(
+            None if database_file is None else _open_database_file(database_file)
+        ),
     )
     try:
         report = analyse(connection)
@@ -374,10 +377,25 @@ def _check_output_folder(path: Path) -> None:
         raise InputError(message)
 
 
-def _remove_database_file(path: Path) -> None:
-    """Delete an existing database file so the run starts with a fresh database.
+def _check_different_files(out_file: Path, database_file: Path) -> None:
+    """Raise ``InputError`` if the report and the database would share a file.
+
+    Paths are resolved first, so a relative and an absolute path to the same
+    file are caught.
+    """
+    if out_file.resolve() == database_file.resolve():
+        message = "--out and --db-file must be different files"
+        raise InputError(message)
+
+
+def _open_database_file(path: Path) -> duckdb.DuckDBPyConnection:
+    """Replace any existing database file and open a new, empty one.
 
     DuckDB keeps a write-ahead log beside the file, which is removed too.
+
+    Raises:
+        InputError: If the old file cannot be removed or the new one cannot
+            be created.
     """
     for file in (path, path.with_name(f"{path.name}.wal")):
         try:
@@ -385,6 +403,11 @@ def _remove_database_file(path: Path) -> None:
         except OSError:
             message = f"Could not replace {file}"
             raise InputError(message) from None
+    try:
+        return duckdb.connect(str(path))
+    except duckdb.Error:
+        message = f"Could not create {path}"
+        raise InputError(message) from None
 
 
 def _write_report(path: Path, html: str) -> None:

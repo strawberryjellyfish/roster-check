@@ -1,7 +1,8 @@
 """Database: load validated records into DuckDB and read the analysis views.
 
-The database is kept in memory unless a file is given, which lets other tools
-such as the optional dashboard read the same tables and views.
+The database is kept in memory unless the caller passes in a connection, for
+example one backed by a file that the optional dashboard can read. Opening such
+a file is left to the command line.
 
 All SQL lives in ``.sql`` files under ``roster_check/sql``. Values always reach
 the database as bound parameters, and views are read by name through DuckDB's
@@ -12,7 +13,6 @@ Python.
 from collections.abc import Sequence
 from dataclasses import astuple
 from importlib.resources import files
-from pathlib import Path
 from typing import Any, TypeAlias
 
 import duckdb
@@ -52,9 +52,9 @@ def create_database(
     shifts: Sequence[Shift],
     sessions: Sequence[Session],
     rejections: Sequence[Rejection],
-    database_file: Path | None = None,
+    connection: duckdb.DuckDBPyConnection | None = None,
 ) -> duckdb.DuckDBPyConnection:
-    """Create a database holding the records and the analysis views.
+    """Load the records and the analysis views into a database.
 
     Args:
         centres: Known centres.
@@ -62,16 +62,16 @@ def create_database(
         shifts: Valid shifts.
         sessions: Valid sessions.
         rejections: Rejected rows from every file.
-        database_file: A file to save the database in, so other tools can
-            read the same tables and views. The file must not already hold
-            these tables. When ``None``, the database is kept in memory.
+        connection: An open connection to an empty database to load into,
+            for example one backed by a file so other tools can read the same
+            tables and views. When ``None``, a new in-memory database is used.
 
     Returns:
-        An open connection. The caller closes it when finished.
+        The connection holding the loaded database. The caller closes it when
+        finished.
     """
-    connection = duckdb.connect(
-        ":memory:" if database_file is None else str(database_file)
-    )
+    if connection is None:
+        connection = duckdb.connect(":memory:")
     run_sql_file(connection, TABLES_FILE)
     load_records(connection, "load_centres.sql", centres)
     load_records(connection, "load_rules.sql", rules)

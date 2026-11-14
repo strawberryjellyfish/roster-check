@@ -101,18 +101,23 @@ def test_sql_files_are_bundled_in_the_package(name: str) -> None:
     assert files("roster_check").joinpath("sql", name).is_file()
 
 
-def test_database_file_keeps_tables_and_views_after_closing(tmp_path: Path) -> None:
+def test_given_connection_is_loaded_and_returned(tmp_path: Path) -> None:
     database_file = tmp_path / "roster_check.duckdb"
+    file_connection = duckdb.connect(str(database_file))
+
     connection = create_database(
         centres=CENTRES,
         rules=RULES,
         shifts=[lifeguard()],
         sessions=[make_session()],
         rejections=[],
-        database_file=database_file,
+        connection=file_connection,
     )
     connection.close()
 
+    assert connection is file_connection
+
+    # Reopening the closed file proves the tables and views were saved in it.
     with duckdb.connect(str(database_file), read_only=True) as reopened:
         for view in VIEW_NAMES:
             assert isinstance(fetch_view(reopened, view), list)
