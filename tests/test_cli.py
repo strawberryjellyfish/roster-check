@@ -7,6 +7,7 @@ import webbrowser
 from datetime import datetime
 from importlib.metadata import version
 from pathlib import Path
+from unittest.mock import Mock
 
 import duckdb
 import pytest
@@ -421,6 +422,34 @@ def test_db_file_saves_the_tables_and_views(
         tables = {row[0] for row in connection.execute("SHOW TABLES").fetchall()}
     assert {"centres", "rules", "shifts", "sessions", "rejections"} <= tables
     assert tables >= VIEW_NAMES
+
+
+@pytest.mark.parametrize("failing_stage", ["create_database", "analyse"])
+def test_db_file_connection_is_closed_on_pipeline_failure(
+    tmp_path: Path,
+    small_inputs: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    failing_stage: str,
+) -> None:
+    database_file = tmp_path / "roster_check.duckdb"
+    open_database = cli._open_database_file
+    connections: list[duckdb.DuckDBPyConnection] = []
+
+    def capture_connection(path: Path) -> duckdb.DuckDBPyConnection:
+        connection = open_database(path)
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(cli, "_open_database_file", capture_connection)
+    monkeypatch.setattr(
+        cli, failing_stage, Mock(side_effect=RuntimeError("pipeline failed"))
+    )
+
+    assert run_cli(*small_inputs, "--db-file", str(database_file)) == 1
+
+    assert len(connections) == 1
+    with pytest.raises(duckdb.ConnectionException, match="closed"):
+        connections[0].table("centres")
 
 
 def test_db_file_replaces_an_existing_file(

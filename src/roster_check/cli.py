@@ -264,20 +264,20 @@ def build_report(
         sessions_csv, centre_codes, {rule.activity for rule in rules}
     )
 
-    connection = create_database(
-        centres=centres,
-        rules=rules,
-        shifts=shifts.valid,
-        sessions=sessions.valid,
-        rejections=shifts.rejected + sessions.rejected,
-        connection=(
-            None if database_file is None else _open_database_file(database_file)
-        ),
-    )
+    connection = None if database_file is None else _open_database_file(database_file)
     try:
+        connection = create_database(
+            centres=centres,
+            rules=rules,
+            shifts=shifts.valid,
+            sessions=sessions.valid,
+            rejections=shifts.rejected + sessions.rejected,
+            connection=connection,
+        )
         report = analyse(connection)
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
 
     html = render_report(
         report,
