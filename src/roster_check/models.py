@@ -141,3 +141,119 @@ class ValidationResult(Generic[T]):
     valid: tuple[T, ...]
     rejected: tuple[Rejection, ...]
     warnings: tuple[RowWarning, ...]
+
+
+def percentage(part: int, whole: int) -> float:
+    """Return ``part`` as a percentage of ``whole``, or 0 when ``whole`` is 0."""
+    return 0.0 if whole == 0 else 100 * part / whole
+
+
+@dataclass(frozen=True)
+class Kpis:
+    """The headline numbers at the top of the report."""
+
+    sessions_analysed: int
+    understaffed_sessions: int
+    staff_hours: float
+    total_attendance: int
+    rows_rejected: int
+
+    @property
+    def understaffed_percent(self) -> float:
+        """Understaffed sessions as a percentage of sessions analysed."""
+        return percentage(self.understaffed_sessions, self.sessions_analysed)
+
+
+@dataclass(frozen=True)
+class CentreSummary:
+    """Understaffing at one centre."""
+
+    centre_code: str
+    centre_name: str
+    sessions: int
+    understaffed_sessions: int
+
+    @property
+    def understaffed_percent(self) -> float:
+        """Understaffed sessions as a percentage of the centre's sessions."""
+        return percentage(self.understaffed_sessions, self.sessions)
+
+
+@dataclass(frozen=True)
+class HeatmapCell:
+    """Sessions starting in one hour of one day of the week.
+
+    Attributes:
+        weekday: Day of the week, Monday is 0.
+        hour: Hour of the day the sessions start, 0 to 23.
+        sessions: Sessions starting in this hour.
+        understaffed_sessions: How many of them were understaffed.
+        shortfall: Total staff missing across them.
+    """
+
+    weekday: int
+    hour: int
+    sessions: int
+    understaffed_sessions: int
+    shortfall: int
+
+
+@dataclass(frozen=True)
+class DailyTotal:
+    """Total attendance and rostered staff hours on one day."""
+
+    day: date
+    attendance: int
+    staff_hours: float
+
+
+@dataclass(frozen=True)
+class RoleShortfall:
+    """Staff required and present in one role for one session."""
+
+    role: str
+    required: int
+    present: int
+
+
+@dataclass(frozen=True)
+class UnderstaffedSession:
+    """An understaffed session, with the roles that were short."""
+
+    session_id: str
+    session_date: date
+    centre_name: str
+    activity: str
+    start_time: time
+    end_time: time
+    attendance: int
+    shortfall: int
+    roles: tuple[RoleShortfall, ...]
+
+
+@dataclass(frozen=True)
+class ReportData:
+    """Every number the report needs, and nothing else.
+
+    Holds no staff names or IDs, so it is safe to pass to the AI summary.
+
+    Attributes:
+        period_start: First session date, or ``None`` if there are no sessions.
+        period_end: Last session date, or ``None`` if there are no sessions.
+        kpis: The headline numbers.
+        centres: Understaffing at each centre, ordered by centre code.
+        heatmap: Sessions by day of the week and starting hour. Only cells
+            with sessions are included.
+        daily: Attendance and staff hours for each day, in date order.
+        worst_sessions: Up to ten understaffed sessions, worst first.
+        staffing_rules: The rules used, for the report footer.
+    """
+
+    period_start: date | None
+    period_end: date | None
+    kpis: Kpis
+    centres: tuple[CentreSummary, ...]
+    heatmap: tuple[HeatmapCell, ...]
+    daily: tuple[DailyTotal, ...]
+    worst_sessions: tuple[UnderstaffedSession, ...]
+    staffing_rules: tuple[StaffingRule, ...]
