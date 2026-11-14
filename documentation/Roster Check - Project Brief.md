@@ -123,7 +123,7 @@ How these rules are applied is set out in 4.6.
 
 ### 4.4 Deliberate bad data and how each case is handled
 
-The sample CSVs contain about 20 bad rows spread across both files, so the "data problems" section of the report is always populated in the demo. Every row-level case (1 to 14) appears in the sample, and case 15 is covered by writing `rosters.csv` as an Excel export. Cases 16 to 18 would stop the sample run from producing a report, so they are covered by fixtures in `tests/fixtures/` instead. Each case below has its own test.
+The sample CSVs contain about 20 bad rows spread across both files, so the "data problems" section of the report is always populated in the demo. Every row-level case (1 to 14) appears in the sample, and case 15 is covered by writing `rosters.csv` as an Excel export. Cases 16 and 17 are fatal and would stop the sample run from producing a report, and case 18 needs a file in which every row is rejected, which the sample deliberately does not have. All three are covered by fixtures in `tests/fixtures/` instead. Each case below has its own test.
 
 Rows fall into three outcomes:
 
@@ -441,7 +441,7 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D13 | Staff hours include every role. | "Rostered hours" means all rostered hours. | 4.6 |
 | D14 | Heatmap places each session in its starting hour. | Every session appears exactly once. | 5.2 |
 | D15 | Bundled data lives inside the package, in `src/roster_check/data/`. | `pip install .` includes it, so running with no arguments works after a normal install, not only from a clone. | 6.1 |
-| D16 | The sample covers every row-level bad-data case; fatal cases 16 to 18 are covered by test fixtures. CSV files are stored byte for byte in git. | A fatal case in the sample would stop the demo report. Git line-ending conversion would otherwise remove case 15. | 4.4 |
+| D16 | The sample covers every row-level bad-data case; cases 16 to 18 are covered by test fixtures. CSV files are stored byte for byte in git. | Fatal cases 16 and 17 would stop the demo report, and case 18 would leave it with no usable rows. Git line-ending conversion would otherwise remove case 15. | 4.4 |
 
 ### Still open
 

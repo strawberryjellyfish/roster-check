@@ -17,8 +17,11 @@ import math
 import random
 from dataclasses import dataclass
 from datetime import date, time, timedelta
+from importlib.resources import files
 from pathlib import Path
 
+# Output goes into the checkout so the regenerated files can be committed.
+# Reference data is read from the installed package instead.
 DATA_DIR = Path(__file__).resolve().parent.parent / "src" / "roster_check" / "data"
 DEFAULT_OUT_DIR = DATA_DIR / "sample"
 
@@ -227,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
 
 def load_centre_codes() -> list[str]:
     """Read the known centre codes from the bundled ``centres.csv``."""
-    with (DATA_DIR / "centres.csv").open(encoding="utf-8", newline="") as file:
+    centres = files("roster_check").joinpath("data", "centres.csv")
+    with centres.open(encoding="utf-8", newline="") as file:
         return [row["centre_code"] for row in csv.DictReader(file)]
 
 
@@ -238,7 +242,8 @@ def load_staffing_rules() -> dict[tuple[str, str], tuple[int, int]]:
         A mapping of ``(activity, role)`` to
         ``(participants_per_staff, minimum_staff)``.
     """
-    with (DATA_DIR / "staffing_rules.csv").open(encoding="utf-8", newline="") as file:
+    rules = files("roster_check").joinpath("data", "staffing_rules.csv")
+    with rules.open(encoding="utf-8", newline="") as file:
         return {
             (row["activity"], row["role"]): (
                 int(row["participants_per_staff"]),
