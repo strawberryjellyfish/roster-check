@@ -221,8 +221,8 @@ The exact text is fixed by tests. `{label}` is the plain-English column name, fo
 2. **Headline numbers (KPI tiles).** Sessions analysed; understaffed sessions (count and percent); total staff hours rostered; total attendance; rows rejected. Numbers count up from zero on load.
 3. **Summary.** If `--summarise` ran, Claude's 3 to 5 sentence summary in a highlighted panel, labelled as AI-generated. Otherwise a short rule-based summary built from the numbers, so the report never looks empty.
 4. **Understaffed sessions by centre.** Horizontal bar chart, one bar per centre, bars grow in on load with a slight stagger. Shows both the count and the percentage of that centre's sessions.
-5. **When the gaps happen.** Heatmap of day of week (rows) by hour of day (columns), cell shade showing the staff shortfall. Each session is placed in the hour it starts, and a cell's value is the total shortfall of the sessions starting in that day and hour. Cells fade in. Hovering a cell shows the exact numbers (native SVG `<title>` tooltip, no library).
-6. **Attendance versus staffing over time.** Daily line chart with two lines (total attendance, and total staff hours scaled to a second axis or shown as bars). Lines draw themselves on load using the SVG stroke-dash technique.
+5. **When the gaps happen.** Heatmap of day of week (rows) by hour of day (columns), cell shade showing the staff shortfall in five fixed levels (0, 1, 2 to 3, 4 to 6, 7 or more), with the number shown in every cell that has a shortfall. Hours with no sessions are drawn as empty cells. Each session is placed in the hour it starts, and a cell's value is the total shortfall of the sessions starting in that day and hour. Cells fade in. Hovering a cell shows the exact numbers (native SVG `<title>` tooltip, no library).
+6. **Attendance versus staffing over time.** Two aligned line panels sharing the date axis: total attendance above, total staff hours below, each with its own axis starting at zero. Days are placed by date. Lines draw themselves on load using the SVG stroke-dash technique.
 7. **Worst ten understaffed sessions.** A table: date, centre, activity, time, attendance, and the shortfall in plain words ("Needs 3 swim instructors, had 1"). Shortfall shown with a small inline bar. Ranked by shortfall (highest first), then attendance (highest first), then date, start time and session ID, so ties always appear in the same order.
 8. **Data problems.** Grouped by file. A table of rejected rows with line number, reason, and the raw row text in monospace so the user can find and fix it in their spreadsheet. A collapsible "auto-fixed" list beneath. If there are no problems, a short green "All rows were usable" message.
 9. **Footer.** How the numbers were calculated (one short paragraph plus the staffing rules table, including the concurrent-sessions simplification from 4.6), tool version, and "All data in this report is fictional."
@@ -260,7 +260,8 @@ roster-check/
 │   ├── workflows/ci.yml
 │   └── pull_request_template.md
 ├── scripts/
-│   └── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
+│   ├── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
+│   └── preview_charts.py         # development aid: every chart from the sample data on one page
 ├── dashboard/                    # STRETCH (M9): optional Evidence.dev project, needs Node
 │   ├── package.json
 │   ├── sources/roster_check/     # DuckDB connection to the --db-file output
@@ -316,7 +317,7 @@ roster-check/
 | `validate` | raw rows, known centres, rules | `ValidationResult(valid, rejected, warnings)` | Pure functions, no I/O. One parser per field type. |
 | `db` | valid rows, rejections, centres, rules | DuckDB connection with `shifts`, `sessions`, `rules`, `centres`, `rejections` tables and the analysis views | Uses explicit column types. Reads SQL files via `importlib.resources`. |
 | `analysis` | connection | `ReportData` dataclass | All numbers the report needs, nothing else. |
-| `charts` | plain lists and dicts | SVG strings | No DuckDB, no Jinja. |
+| `charts` | `ReportData` parts (`CentreSummary`, `HeatmapCell`, `DailyTotal`) and plain numbers | SVG strings | No DuckDB, no Jinja. No colours or animation in the SVG: CSS classes only. |
 | `summarise` | `ReportData` | `str` or `None` | Sends aggregates only. Returns `None` on any failure. |
 | `report` | `ReportData`, charts, rejections, summary | HTML string | Writing to disk happens in `cli`. |
 | `cli` | argv | exit code | The only module that prints or touches the filesystem for output. |
@@ -505,11 +506,13 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D19 | Exact wording for every message. | Messages are tested exactly, so wording changes are deliberate. | 4.5 |
 | D20 | `ReportData` structure, with percentages as calculated properties and no staff names or IDs. | One place for every report figure; safe to pass to the AI summary by construction. | 6.2.1 |
 | D21 | All SQL in files: tables, parameterised loads, and views for every calculation and report section. A `centres` table is added. | Meets the rule that SQL lives in `.sql` files, keeps values out of SQL text, and lets the dashboard reuse the same logic. | 6.2.1 |
+| D22 | Attendance and staff hours are two aligned line panels sharing the date axis, not one chart with a second axis. | Two-axis charts invite comparing where the lines cross, which means nothing. Each panel keeps an honest axis from zero. | 5.2 |
+| D23 | Charts take the `ReportData` dataclasses, and their SVG carries CSS classes rather than colours or animation. | The dataclasses are already plain, agreed structures. Colours, dark mode and motion are then set once in the report stylesheet. | 5.3, 6.2 |
+| D24 | Heatmap shades use fixed shortfall levels, and cells with a shortfall show the number. | The same shortfall looks the same in every report, and colour is never the only signal. | 5.2 |
 
 ### Still open
 
 These are decided at the start of the milestone that needs them:
 
-- The line chart's layout (5.2 item 6): second axis, bars, or two aligned charts. Before M4.
 - The wording of the rule-based summary and the Claude prompt (5.2 item 3, 6.4). Before M5 and M7.
 - CLI edge cases: overwriting an existing report, which exit code wins when `--strict` and a fatal error both apply, and `--open` when no browser is available. Before M6.
