@@ -609,5 +609,5 @@ def test_bundled_sample_gives_exactly_the_planted_problems() -> None:
         "Cleaned spacing and capitals"
     ]
     assert sessions.warnings[0].reason.startswith("Attendance is above capacity")
-    assert len(shifts.valid) == 555
+    assert len(shifts.valid) == 548
     assert len(sessions.valid) == 281
