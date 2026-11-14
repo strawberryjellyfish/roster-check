@@ -107,22 +107,26 @@ def _split_lines(text: str) -> list[str]:
 def _parse_line(line: str) -> tuple[tuple[str, ...], str | None]:
     """Split one CSV line into fields, honouring quotes.
 
-    A properly quoted line always holds an even number of quote characters,
-    so an odd number means a quoted field was never closed. Such a line is
-    reported rather than parsed, so a fragment is never mistaken for a row.
+    The line is parsed strictly: a field that opens with a quote must close
+    it before the next comma or the end of the line. A quote inside an
+    unquoted field, such as ``25" pool``, is ordinary text. A line that fails
+    is reported rather than parsed, so a fragment is never mistaken for a row.
 
     Returns:
         The fields and ``None``, or no fields and the reason the line could
         not be read.
     """
-    if line.count('"') % 2:
-        return (), UNFINISHED_QUOTE
     try:
-        return tuple(next(csv.reader([line]))), None
+        return tuple(next(csv.reader([line], strict=True))), None
     except csv.Error:
-        # For one line with balanced quotes, the reader only raises when a
-        # field is over its size limit.
+        pass
+    try:
+        next(csv.reader([line]))
+    except csv.Error:
+        # Without strict quoting, the reader only raises when a field is over
+        # its size limit, so the strict failure was not about quoting.
         return (), FIELD_TOO_LONG
+    return (), UNFINISHED_QUOTE
 
 
 def _check_header(

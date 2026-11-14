@@ -6,7 +6,7 @@ import pytest
 
 from roster_check.ingest import FIELD_TOO_LONG, UNFINISHED_QUOTE, read_csv
 from roster_check.models import InputError
-from roster_check.validate import ROSTER_COLUMNS, SESSION_COLUMNS
+from roster_check.validate import ROSTER_COLUMNS, SESSION_COLUMNS, validate_shifts
 
 FIRST_ROW = "SH-00001,RBC,S-001,Jordan Placeholder,lifeguard,03/11/2026,06:00,10:30"
 
@@ -151,9 +151,45 @@ def test_unfinished_quote_is_reported_not_parsed(tmp_path: Path) -> None:
 
     csv_file = read_csv(path, ROSTER_COLUMNS)
 
-    assert [row.problem for row in csv_file.rows] == [UNFINISHED_QUOTE] * 3
-    assert all(row.fields == () for row in csv_file.rows)
+    first, continuation, last = csv_file.rows
+    assert first.problem == UNFINISHED_QUOTE
+    assert first.fields == ()
+    assert last.problem == UNFINISHED_QUOTE
+    assert last.fields == ()
+    # The continuation's quote sits inside an unquoted field, so it parses,
+    # but with too few columns to pass validation.
+    assert continuation.problem is None
+    assert len(continuation.fields) == 5
     assert [row.raw_text for row in csv_file.rows] == lines
+
+
+def test_text_after_a_closing_quote_is_reported(tmp_path: Path) -> None:
+    path = tmp_path / "rosters.csv"
+    line = 'SH-00001,RBC,S-001,"Jordan" Placeholder,lifeguard,03/11/2026,06:00,10:30'
+    path.write_text(f"{','.join(ROSTER_COLUMNS)}\n{line}\n", encoding="utf-8")
+
+    csv_file = read_csv(path, ROSTER_COLUMNS)
+
+    assert csv_file.rows[0].problem == UNFINISHED_QUOTE
+
+
+def test_quote_inside_an_unquoted_extra_column_is_ordinary_text(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "rosters.csv"
+    path.write_text(
+        f'{",".join(ROSTER_COLUMNS)},notes\n{FIRST_ROW},25" pool\n',
+        encoding="utf-8",
+    )
+
+    csv_file = read_csv(path, ROSTER_COLUMNS)
+    result = validate_shifts(csv_file, {"RBC"})
+
+    assert csv_file.rows[0].problem is None
+    assert csv_file.rows[0].fields[-1] == '25" pool'
+    assert csv_file.ignored_columns == ("notes",)
+    assert [shift.shift_id for shift in result.valid] == ["SH-00001"]
+    assert result.rejected == ()
 
 
 def test_oversized_field_in_an_ignored_column_is_reported_not_raised(
