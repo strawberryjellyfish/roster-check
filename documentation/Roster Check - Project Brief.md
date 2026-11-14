@@ -359,7 +359,7 @@ Structures passed between `ingest` and `validate`:
 
 #### SQL organisation
 
-All SQL is in `src/roster_check/sql/`. `00_tables.sql` creates the tables, one `load_*.sql` file per table holds its parameterised insert, and files `01` to `04` create views: required staff, staff present, shortfall by role and session, and one `report_*` view per report section. The only SQL text in Python is `SELECT * FROM <view>`, with the view name checked against a fixed list. Keeping the logic in views means the stretch Evidence dashboard can reuse it from a `--db-file` database.
+All SQL is in `src/roster_check/sql/`. `00_tables.sql` creates the tables, one `load_*.sql` file per table holds its parameterised insert, and files `01` to `04` create views: required staff, staff present, shortfall by role and session, and one `report_*` view per report section. Python holds no SQL text: views are read by name with DuckDB's `connection.table()`, and the name is checked against a fixed list first. Keeping the logic in views means the stretch Evidence dashboard can reuse it from a `--db-file` database.
 
 ### 6.3 Command line
 

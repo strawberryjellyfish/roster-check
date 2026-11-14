@@ -1,8 +1,9 @@
 """Database: load validated records into DuckDB and read the analysis views.
 
 All SQL lives in ``.sql`` files under ``roster_check/sql``. Values always reach
-the database as bound parameters; the only SQL built in Python selects from a
-view whose name is checked against a fixed list.
+the database as bound parameters, and views are read by name through DuckDB's
+relation API, with the name checked against a fixed list. No SQL is built in
+Python.
 """
 
 from collections.abc import Sequence
@@ -107,7 +108,6 @@ def fetch_view(
     if view not in VIEW_NAMES:
         message = f"Unknown view '{view}'"
         raise ValueError(message)
-    # Safe: the name has been checked against a fixed list of views.
-    cursor = connection.execute(f"SELECT * FROM {view}")  # noqa: S608
-    columns = [column[0] for column in cursor.description]
-    return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
+    relation = connection.table(view)
+    columns = relation.columns
+    return [dict(zip(columns, row, strict=True)) for row in relation.fetchall()]
