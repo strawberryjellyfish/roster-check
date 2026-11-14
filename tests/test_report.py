@@ -190,7 +190,13 @@ def test_badge_wording(rows_rejected: int, expected: str) -> None:
 
 @pytest.mark.parametrize(
     ("percent", "expected"),
-    [(0.0, "0%"), (0.2, "less than 1%"), (0.5, "0%"), (15.3, "15%"), (100.0, "100%")],
+    [
+        (0.0, "0%"),
+        (0.2, "less than 1%"),
+        (0.5, "less than 1%"),
+        (15.3, "15%"),
+        (100.0, "100%"),
+    ],
 )
 def test_percentages_are_whole_numbers_but_never_hide_a_problem(
     percent: float, expected: str

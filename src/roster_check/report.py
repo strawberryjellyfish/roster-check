@@ -208,7 +208,7 @@ def percent_text(percent: float) -> str:
     A share above zero that would round to 0 is shown as "less than 1%", so a
     real problem never reads as none.
     """
-    if 0 < percent < 0.5:
+    if 0 < percent <= 0.5:
         return "less than 1%"
     return f"{percent:.0f}%"
 
