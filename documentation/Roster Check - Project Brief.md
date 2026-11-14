@@ -163,6 +163,35 @@ The tool must never crash with a Python traceback on bad input. Any unexpected e
 - **Duplicate IDs (case 11).** The first row with an ID claims it, even if that row is rejected for another reason. Later rows with the same ID are rejected.
 - **Headers.** Column names are matched ignoring case and surrounding spaces, and columns may appear in any order. Extra columns are ignored and noted once in the terminal summary. The column count check (case 12) compares each row with the header.
 - **Encoding.** Files are read as UTF-8, with or without a byte-order mark. If that fails, the file is read as Windows-1252 and a one-line note is added to the terminal summary.
+- **One record per line.** Each line is parsed on its own so its raw text can be shown in the report. Quoted fields containing line breaks are not supported and fail the column count check.
+- **Line numbers** are physical lines in the file, with the header as line 1.
+- **Check order.** The column count is checked first; a row with the wrong number of columns claims no ID. Fields are then checked in the order section 4 lists them, whatever the file's column order. A blank ID claims nothing.
+- **Roles** are the fixed list in 4.1. Every role in `staffing_rules.csv` must be one of them, and a repeated activity and role pair there is fatal.
+- **Staff names** are optional; a blank name is stored as no name.
+
+#### Messages
+
+The exact text is fixed by tests. `{label}` is the plain-English column name, for example "staff ID" or "session date".
+
+| Problem | Message |
+|---|---|
+| Blank required field | `Missing {label}` |
+| Impossible date | `Date 31/11/2026 does not exist` |
+| Unreadable date or time | `Could not read {label} '{value}'` |
+| Ends before it starts | `Shift ends before it starts`, `Session ends before it starts` |
+| Same start and end time | `Shift starts and ends at the same time` (and for sessions) |
+| Not a number | `Attendance 'twelve' is not a number` |
+| Decimal number | `Attendance '12.5' is not a whole number` |
+| Negative attendance or minimum staff | `Attendance cannot be negative` |
+| Capacity or ratio of 0 or less | `Capacity must be greater than 0` |
+| Over capacity (warning) | `Attendance is above capacity (31 of 24)` |
+| Unknown value | `Unknown centre 'XYZ'`, `Unknown role 'cleaner'`, `Unknown activity 'aqua_zumba'` |
+| Duplicate ID or rule | `Duplicate shift ID, first seen on line 88` |
+| Wrong column count | `Expected 8 columns, found 6` |
+| Cleaned (warning) | `Cleaned spacing and capitals` |
+| Fatal: file | `rosters.csv not found`, `rosters.csv has no rows`, `Could not read rosters.csv` |
+| Fatal: header | `rosters.csv is missing column 'staff_id'`, `rosters.csv has duplicate column 'role'` |
+| Fatal: reference row | `staffing_rules.csv line 4: Unknown role 'cleaner'` |
 
 ### 4.6 How understaffing is calculated
 
@@ -300,6 +329,15 @@ Defined in `models.py` as frozen dataclasses. Field names follow the CSV columns
 | `Centre` | `centre_code`, `centre_name` |
 | `Rejection` | `file_name`, `line_number`, `raw_text`, `reason` |
 | `RowWarning` | `file_name`, `line_number`, `raw_text`, `reason` |
+
+Structures passed between `ingest` and `validate`:
+
+| Name | Fields or purpose |
+|---|---|
+| `RawRow` | `line_number`, `raw_text`, `fields`: one non-blank data line, before validation |
+| `CsvFile` | `file_name`, `header`, `rows`, `blank_lines`, `ignored_columns`, `used_fallback_encoding`: what `ingest` returns for each file |
+| `ValidationResult` | `valid`, `rejected`, `warnings`: what `validate` returns for each data file |
+| `InputError` | Exception for fatal problems, carrying the one-line message shown to the user |
 
 `RowWarning` is named to avoid clashing with Python's built-in `Warning` class. `ReportData` is defined at the start of M3, when the analysis outputs are built, and confirmed before use.
 
@@ -442,6 +480,9 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D14 | Heatmap places each session in its starting hour. | Every session appears exactly once. | 5.2 |
 | D15 | Bundled data lives inside the package, in `src/roster_check/data/`. | `pip install .` includes it, so running with no arguments works after a normal install, not only from a clone. | 6.1 |
 | D16 | The sample covers every row-level bad-data case; cases 16 to 18 are covered by test fixtures. CSV files are stored byte for byte in git. | Fatal cases 16 and 17 would stop the demo report, and case 18 would leave it with no usable rows. Git line-ending conversion would otherwise remove case 15. | 4.4 |
+| D17 | Ingest and validation structures (`RawRow`, `CsvFile`, `ValidationResult`, `InputError`); reference-row failures raise `InputError` from `validate`. | Agreed structures before M2; the fatal rule for reference data lives in one place. | 6.2.1 |
+| D18 | One record per line, physical line numbers, column count checked first, fields checked in the brief's order. | Raw text can be shown for every row, line numbers match a text editor, and the reason for a row does not depend on the file's column order. | 4.5 |
+| D19 | Exact wording for every message. | Messages are tested exactly, so wording changes are deliberate. | 4.5 |
 
 ### Still open
 

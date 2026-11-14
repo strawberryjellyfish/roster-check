@@ -1,0 +1,4 @@
+session_id,centre_code,activity,session_date,start_time,end_time,capacity,attendance
+SE-00001,XYZ,swim_lesson,04/11/2026,16:00,16:45,24,19
+SE-00002,NTH,aqua_zumba,04/11/2026,16:00,16:45,24,19
+,NTH,swim_lesson,04/11/2026,16:00,16:45,24,19
