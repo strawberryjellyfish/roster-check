@@ -209,23 +209,23 @@ The exact text is fixed by tests. `{label}` is the plain-English column name, fo
 ### 5.1 Principles
 
 - **One file, fully self-contained.** All CSS, JS and SVG is inlined. No external requests of any kind, so it works offline, by email attachment, or from a USB stick. A test enforces this.
-- **One page.** Designed to read top to bottom on a laptop screen, and to print on one A4 page landscape via print CSS (animations off, details collapsed).
+- **One page.** Designed to read top to bottom on a laptop screen. Prints on A4 landscape via print CSS (animations off, details collapsed): the whole analysis fits the first page, and the data problems and method follow on the second.
 - **Appealing but calm.** A clean card layout, a restrained palette with one accent colour, good typography from the system font stack, and light and dark mode via `prefers-color-scheme`.
 - **Animated where it helps.** Animations make the report feel alive on first open but never hide information.
-- **Accessible.** Every chart has a text alternative and a visible data table nearby. Colour is never the only signal. `prefers-reduced-motion` turns all animation off.
+- **Accessible.** Every chart has a text alternative and its numbers in a table directly beneath it, in a collapsed "Show the numbers" section. Colour is never the only signal. `prefers-reduced-motion` turns all animation off.
 - **Australian dates.** Dates are shown with the month spelled out, for example "Tue 4 Nov 2026", so they cannot be misread whichever date convention the reader is used to.
 
 ### 5.2 Sections, top to bottom
 
 1. **Header.** Organisation name, date range covered, when the report was generated, and a data-quality badge ("All rows used" in green, or "14 rows need attention" in amber, linking to the Data problems section, item 8 below).
 2. **Headline numbers (KPI tiles).** Sessions analysed; understaffed sessions (count and percent); total staff hours rostered; total attendance; rows rejected. Numbers count up from zero on load.
-3. **Summary.** If `--summarise` ran, Claude's 3 to 5 sentence summary in a highlighted panel, labelled as AI-generated. Otherwise a short rule-based summary built from the numbers, so the report never looks empty.
+3. **Summary.** If `--summarise` ran, Claude's 3 to 5 sentence summary in a highlighted panel, labelled as AI-generated. Otherwise a short rule-based summary built from the numbers, so the report never looks empty. The rule-based summary has up to four sentences: the share of understaffed sessions over the period, the centre with the highest share, the day of the week and starting hour with the largest combined shortfall, and the rows that could not be used. For example: "From Mon 2 Nov to Sun 15 Nov 2026, 43 of 281 sessions (15%) were understaffed. Northgate had the highest share, with 17 of its 70 sessions short of staff. The largest gap was on Thursdays at 16:00, with a combined shortfall of 11 staff. 17 rows could not be used and are listed under Data problems." With no understaffing it says every session was fully staffed; with no sessions it says none could be analysed. Ties go to the higher count, then report order, and to the earlier day and hour. A share above zero that rounds to 0 reads "less than 1%".
 4. **Understaffed sessions by centre.** Horizontal bar chart, one bar per centre, bars grow in on load with a slight stagger. Shows both the count and the percentage of that centre's sessions.
 5. **When the gaps happen.** Heatmap of day of week (rows) by hour of day (columns), cell shade showing the staff shortfall in five fixed levels (0, 1, 2 to 3, 4 to 6, 7 or more), with the number shown in every cell that has a shortfall. Hours with no sessions are drawn as empty cells. Each session is placed in the hour it starts, and a cell's value is the total shortfall of the sessions starting in that day and hour. Cells fade in. Hovering a cell shows the exact numbers (native SVG `<title>` tooltip, no library).
 6. **Attendance versus staffing over time.** Two aligned line panels sharing the date axis: total attendance above, total staff hours below, each with its own axis starting at zero. Days are placed by date. Lines draw themselves on load using the SVG stroke-dash technique.
 7. **Worst ten understaffed sessions.** A table: date, centre, activity, time, attendance, and the shortfall in plain words ("Needs 3 swim instructors, had 1"). Shortfall shown with a small inline bar. Ranked by shortfall (highest first), then attendance (highest first), then date, start time and session ID, so ties always appear in the same order.
 8. **Data problems.** Grouped by file. A table of rejected rows with line number, reason, and the raw row text in monospace so the user can find and fix it in their spreadsheet. A collapsible "auto-fixed" list beneath. If there are no problems, a short green "All rows were usable" message.
-9. **Footer.** How the numbers were calculated (one short paragraph plus the staffing rules table, including the concurrent-sessions simplification from 4.6), tool version, and "All data in this report is fictional."
+9. **Footer.** How the numbers were calculated (one short paragraph plus the staffing rules table, including the concurrent-sessions simplification from 4.6), tool version, and, when the bundled sample data was used, "All data in this report is fictional."
 
 ### 5.3 How the visuals are built
 
@@ -261,7 +261,7 @@ roster-check/
 │   └── pull_request_template.md
 ├── scripts/
 │   ├── make_sample_data.py       # seeded generator, plus the fixed list of bad rows
-│   └── preview_charts.py         # development aid: every chart from the sample data on one page
+│   └── preview_report.py         # development aid: the sample report, until the CLI writes it (M6)
 ├── dashboard/                    # STRETCH (M9): optional Evidence.dev project, needs Node
 │   ├── package.json
 │   ├── sources/roster_check/     # DuckDB connection to the --db-file output
@@ -319,7 +319,7 @@ roster-check/
 | `analysis` | connection | `ReportData` dataclass | All numbers the report needs, nothing else. |
 | `charts` | `ReportData` parts (`CentreSummary`, `HeatmapCell`, `DailyTotal`) and plain numbers | SVG strings | No DuckDB, no Jinja. No colours or animation in the SVG: CSS classes only. |
 | `summarise` | `ReportData` | `str` or `None` | Sends aggregates only. Returns `None` on any failure. |
-| `report` | `ReportData`, charts, rejections, summary | HTML string | Writing to disk happens in `cli`. |
+| `report` | `ReportData`, each data file's `ValidationResult`, generated time, version, sample-data flag | HTML string | Draws the charts, writes the rule-based summary. Writing to disk happens in `cli`. The AI summary is added in M7. |
 | `cli` | argv | exit code | The only module that prints or touches the filesystem for output. |
 
 ### 6.2.1 Data structures
@@ -509,10 +509,15 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D22 | Attendance and staff hours are two aligned line panels sharing the date axis, not one chart with a second axis. | Two-axis charts invite comparing where the lines cross, which means nothing. Each panel keeps an honest axis from zero. | 5.2 |
 | D23 | Charts take the `ReportData` dataclasses, and their SVG carries CSS classes rather than colours or animation. | The dataclasses are already plain, agreed structures. Colours, dark mode and motion are then set once in the report stylesheet. | 5.3, 6.2 |
 | D24 | Heatmap shades use fixed shortfall levels, and cells with a shortfall show the number. | The same shortfall looks the same in every report, and colour is never the only signal. | 5.2 |
+| D25 | Rule-based summary wording and tie-breaks as in 5.2 item 3. | Fixed, tested wording that adapts to empty and clean data. | 5.2 |
+| D26 | The "fictional data" note appears only when the bundled sample is used. | The note would be false for a real organisation's files. | 5.2 |
+| D27 | Chart data tables sit in collapsed "Show the numbers" sections. | Keeps the page short and printable while every number stays available to screen readers and on request. | 5.1 |
+| D28 | `report` takes each data file's `ValidationResult`; the header badge counts rejected rows only. | Reuses an agreed structure for the problem lists and the case 18 banner. Auto-fixed rows were used, so they do not need attention. | 6.2, 5.2 |
+| D29 | Print uses two A4 landscape pages: the analysis, then data problems and method. | Seventeen problem rows with their raw text cannot share one page with the charts at a readable size. | 5.1 |
 
 ### Still open
 
 These are decided at the start of the milestone that needs them:
 
-- The wording of the rule-based summary and the Claude prompt (5.2 item 3, 6.4). Before M5 and M7.
+- The wording of the Claude prompt (6.4). Before M7.
 - CLI edge cases: overwriting an existing report, which exit code wins when `--strict` and a fatal error both apply, and `--open` when no browser is available. Before M6.

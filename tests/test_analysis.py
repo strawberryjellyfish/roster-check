@@ -2,52 +2,19 @@
 
 from dataclasses import fields, is_dataclass
 from datetime import date, time
-from importlib.resources import files
-from pathlib import Path
 
 import pytest
-from builders import WEDNESDAY, build_database, lifeguard, make_session, make_shift
-
-from roster_check.analysis import analyse
-from roster_check.db import create_database
-from roster_check.ingest import read_csv
-from roster_check.models import Rejection, ReportData
-from roster_check.validate import (
-    CENTRE_COLUMNS,
-    ROSTER_COLUMNS,
-    SESSION_COLUMNS,
-    STAFFING_RULE_COLUMNS,
-    validate_centres,
-    validate_sessions,
-    validate_shifts,
-    validate_staffing_rules,
+from builders import (
+    WEDNESDAY,
+    build_database,
+    lifeguard,
+    make_session,
+    make_shift,
+    run_sample,
 )
 
-
-def analyse_sample() -> ReportData:
-    """Run the bundled sample data through every stage up to analysis."""
-    data = Path(str(files("roster_check").joinpath("data")))
-    centres = validate_centres(read_csv(data / "centres.csv", CENTRE_COLUMNS))
-    rules = validate_staffing_rules(
-        read_csv(data / "staffing_rules.csv", STAFFING_RULE_COLUMNS)
-    )
-    centre_codes = {centre.centre_code for centre in centres}
-    shifts = validate_shifts(
-        read_csv(data / "sample" / "rosters.csv", ROSTER_COLUMNS), centre_codes
-    )
-    sessions = validate_sessions(
-        read_csv(data / "sample" / "sessions.csv", SESSION_COLUMNS),
-        centre_codes,
-        {rule.activity for rule in rules},
-    )
-    connection = create_database(
-        centres=centres,
-        rules=rules,
-        shifts=shifts.valid,
-        sessions=sessions.valid,
-        rejections=shifts.rejected + sessions.rejected,
-    )
-    return analyse(connection)
+from roster_check.analysis import analyse
+from roster_check.models import Rejection, ReportData
 
 
 def all_strings(value: object) -> list[str]:
@@ -224,7 +191,8 @@ def test_report_data_holds_no_staff_names_or_ids() -> None:
 @pytest.fixture(scope="module")
 def sample_report() -> ReportData:
     """The report figures for the bundled sample data."""
-    return analyse_sample()
+    report, _ = run_sample()
+    return report
 
 
 def test_golden_headline_numbers_for_the_sample(sample_report: ReportData) -> None:

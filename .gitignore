@@ -16,4 +16,4 @@ htmlcov/
 # Generated output
 roster-check-report.html
 *.duckdb
-chart-preview.html
+report-preview.html

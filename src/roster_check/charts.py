@@ -76,6 +76,27 @@ def format_day(day: date) -> str:
     return f"{WEEKDAY_NAMES[day.weekday()]} {day.day} {MONTH_NAMES[day.month - 1]}"
 
 
+def format_number(value: float, *, interval: float | None = None) -> str:
+    """Return a number with thousands separators, for example ``7,234``.
+
+    Small values keep at least three significant digits so they stay distinct,
+    and trailing zeros are trimmed.
+
+    Args:
+        value: The number to format.
+        interval: For axis labels, the gap between ticks. When given, it sets
+            the precision instead of ``value``, so every tick on an axis uses
+            the same number of decimal places.
+    """
+    precision_value = abs(value) if interval is None else interval
+    precision = (
+        max(1, 2 - math.floor(math.log10(precision_value)))
+        if precision_value > 0
+        else 1
+    )
+    return f"{value:,.{precision}f}".rstrip("0").rstrip(".")
+
+
 def centre_bar_chart(centres: Sequence[CentreSummary]) -> str:
     """Draw one horizontal bar per centre showing its understaffed sessions.
 
@@ -347,7 +368,7 @@ def _line_panel(
             _text(
                 DAILY_AXIS_WIDTH - 8,
                 y,
-                _format_value(fraction * axis_max, interval=axis_max / 2),
+                format_number(fraction * axis_max, interval=axis_max / 2),
                 "axis",
                 anchor="end",
             )
@@ -363,7 +384,7 @@ def _line_panel(
     )
     parts.append(f'<path class="line" d="{path}" pathLength="1" />')
     for (x, y), value, day in zip(points, values, days, strict=True):
-        tooltip = f"{format_day(day)}: {name.lower()} {_format_value(value)}"
+        tooltip = f"{format_day(day)}: {name.lower()} {format_number(value)}"
         parts.append(
             f'<circle class="point" cx="{_number(x)}" cy="{_number(y)}" r="3">'
             f"<title>{escape(tooltip)}</title></circle>"
@@ -434,21 +455,6 @@ def _nice_ceiling(value: float) -> float:
         return 1.0
     power = 10 ** math.floor(math.log10(value))
     return float(next(step * power for step in AXIS_STEPS if value <= step * power))
-
-
-def _format_value(value: float, *, interval: float | None = None) -> str:
-    """Format a value, keeping small values and axis tick intervals distinct.
-
-    Use at least three significant digits for small values or tick intervals,
-    and at least one decimal place before trimming trailing zeros.
-    """
-    precision_value = abs(value) if interval is None else interval
-    precision = (
-        max(1, 2 - math.floor(math.log10(precision_value)))
-        if precision_value > 0
-        else 1
-    )
-    return f"{value:,.{precision}f}".rstrip("0").rstrip(".")
 
 
 def _number(value: float) -> str:
