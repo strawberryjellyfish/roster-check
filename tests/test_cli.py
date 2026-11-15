@@ -20,6 +20,9 @@ from roster_check.validate import ROSTER_COLUMNS, SESSION_COLUMNS
 FIXED_TIME = datetime(2026, 11, 15, 9, 30)
 REPORT_FILE = "roster-check-report.html"
 FICTIONAL_NOTE = "All data in this report is fictional."
+AI_UNAVAILABLE_NOTE = (
+    "The AI summary was unavailable, so this summary was built from the numbers."
+)
 
 SAMPLE_SUMMARY = [
     "rosters.csv: 557 rows read, 9 rejected, 1 auto-fixed, 1 blank line skipped",
@@ -233,13 +236,64 @@ def test_strict_succeeds_when_no_row_was_rejected(small_inputs: list[str]) -> No
     assert run_cli(*small_inputs, "--strict") == 0
 
 
-def test_summarise_prints_that_the_summary_is_skipped(
-    small_inputs: list[str], capsys: pytest.CaptureFixture[str]
+def test_summarise_without_an_api_key_is_skipped_and_noted_in_the_report(
+    tmp_path: Path, small_inputs: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run_cli(*small_inputs, "--summarise") == 0
 
     first_line = capsys.readouterr().out.splitlines()[0]
-    assert first_line == "Skipping AI summary: not available in this version"
+    assert first_line == "Skipping AI summary: no API key set"
+    page = (tmp_path / REPORT_FILE).read_text(encoding="utf-8")
+    assert AI_UNAVAILABLE_NOTE in page
+
+
+def test_summarise_puts_the_ai_summary_in_the_report(
+    tmp_path: Path,
+    small_inputs: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "skip_reason", lambda: None)
+    monkeypatch.setattr(cli, "summarise", lambda report: "Staffing held up well.")
+
+    assert run_cli(*small_inputs, "--summarise") == 0
+
+    assert capsys.readouterr().out.splitlines()[0].startswith("clean_rosters.csv:")
+    page = (tmp_path / REPORT_FILE).read_text(encoding="utf-8")
+    assert '<span class="ai-label">AI-generated</span>' in page
+    assert "<p>Staffing held up well.</p>" in page
+
+
+def test_summarise_failure_keeps_the_standard_summary(
+    tmp_path: Path,
+    small_inputs: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "skip_reason", lambda: None)
+    monkeypatch.setattr(cli, "summarise", lambda report: None)
+
+    assert run_cli(*small_inputs, "--summarise") == 0
+
+    first_line = capsys.readouterr().out.splitlines()[0]
+    assert first_line == "AI summary unavailable; the report uses the standard summary"
+    page = (tmp_path / REPORT_FILE).read_text(encoding="utf-8")
+    assert AI_UNAVAILABLE_NOTE in page
+    assert "AI-generated" not in page
+
+
+def test_no_summary_is_requested_without_summarise(
+    tmp_path: Path, small_inputs: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def must_not_run(report: object) -> None:
+        raise AssertionError("summarise was called")
+
+    monkeypatch.setattr(cli, "summarise", must_not_run)
+
+    assert run_cli(*small_inputs) == 0
+
+    page = (tmp_path / REPORT_FILE).read_text(encoding="utf-8")
+    assert AI_UNAVAILABLE_NOTE not in page
 
 
 def test_missing_input_file_is_a_fatal_input_error(
