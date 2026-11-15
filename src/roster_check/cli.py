@@ -26,6 +26,7 @@ from roster_check.db import create_database
 from roster_check.ingest import read_csv
 from roster_check.models import CsvFile, InputError, ReportData, ValidationResult
 from roster_check.report import percent_text, render_report
+from roster_check.summarise import skip_reason, summarise
 from roster_check.validate import (
     CENTRE_COLUMNS,
     CLEANED_REASON,
@@ -49,7 +50,7 @@ SAMPLE_ROSTERS_FILE = DATA_DIR / "sample" / "rosters.csv"
 SAMPLE_SESSIONS_FILE = DATA_DIR / "sample" / "sessions.csv"
 DEFAULT_OUT_FILE = Path("roster-check-report.html")
 
-SUMMARY_SKIPPED = "Skipping AI summary: not available in this version"
+SUMMARY_UNAVAILABLE = "AI summary unavailable; the report uses the standard summary"
 
 
 @dataclass(frozen=True)
@@ -69,12 +70,15 @@ class PipelineOutput:
         reference_files: The centres and staffing rules files as read.
         data_files: The roster and session files, in that order.
         html: The complete report page.
+        summary_message: Why an AI summary that was asked for is missing, or
+            ``None`` when none was asked for or it was produced.
     """
 
     report: ReportData
     reference_files: tuple[CsvFile, ...]
     data_files: tuple[DataFile, ...]
     html: str
+    summary_message: str | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -126,7 +130,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--summarise",
         action="store_true",
-        help="add an AI-written summary to the report (not available yet)",
+        help="add an AI-written summary to the report "
+        "(needs roster-check[ai] and ANTHROPIC_API_KEY)",
     )
     parser.add_argument(
         "--strict",
@@ -191,8 +196,6 @@ def run(args: argparse.Namespace, generated_at: datetime) -> int:
         InputError: If an input file cannot be used or an output file cannot
             be written.
     """
-    if args.summarise:
-        print(SUMMARY_SKIPPED)
     _check_output_folder(args.out)
     if args.db_file is not None:
         _check_output_folder(args.db_file)
@@ -205,8 +208,11 @@ def run(args: argparse.Namespace, generated_at: datetime) -> int:
         generated_at=generated_at,
         sample_data=args.rosters is None or args.sessions is None,
         database_file=args.db_file,
+        ai_summary_requested=args.summarise,
     )
     _write_report(args.out, output.html)
+    if output.summary_message is not None:
+        print(output.summary_message)
     for line in summary_lines(output, args.out):
         print(line)
 
@@ -231,6 +237,7 @@ def build_report(
     generated_at: datetime,
     sample_data: bool,
     database_file: Path | None = None,
+    ai_summary_requested: bool = False,
 ) -> PipelineOutput:
     """Run the input files through every stage of the pipeline.
 
@@ -244,6 +251,9 @@ def build_report(
         database_file: A file to save the database in, replacing any existing
             one once the inputs have been validated, or ``None`` to keep the
             database in memory.
+        ai_summary_requested: True to ask Claude for a summary of the
+            figures. Without an API key or the ``anthropic`` package, or if
+            the request fails, the report keeps the rule-based summary.
 
     Returns:
         The report page together with what the terminal summary needs.
@@ -279,18 +289,24 @@ def build_report(
         if connection is not None:
             connection.close()
 
+    ai_summary, summary_message = (
+        _ask_for_summary(report) if ai_summary_requested else (None, None)
+    )
     html = render_report(
         report,
         [shifts, sessions],
         generated_at=generated_at,
         version=__version__,
         sample_data=sample_data,
+        ai_summary=ai_summary,
+        ai_summary_unavailable=ai_summary_requested and ai_summary is None,
     )
     return PipelineOutput(
         report=report,
         reference_files=(centres_csv, rules_csv),
         data_files=(DataFile(rosters_csv, shifts), DataFile(sessions_csv, sessions)),
         html=html,
+        summary_message=summary_message,
     )
 
 
@@ -315,6 +331,22 @@ def summary_lines(output: PipelineOutput, out_file: Path) -> list[str]:
     )
     lines.append(f"Report written to {out_file}")
     return lines
+
+
+def _ask_for_summary(report: ReportData) -> tuple[str | None, str | None]:
+    """Request the AI summary and return it with the message to print.
+
+    Returns:
+        The summary text, or ``None``, and why it is missing, or ``None``
+        when it was produced.
+    """
+    reason = skip_reason()
+    if reason is not None:
+        return None, reason
+    ai_summary = summarise(report)
+    if ai_summary is None:
+        return None, SUMMARY_UNAVAILABLE
+    return ai_summary, None
 
 
 def _data_file_line(data_file: DataFile) -> str:

@@ -32,7 +32,7 @@ uv run roster-check --rosters my_rosters.csv --sessions my_sessions.csv --out re
 | `--rules PATH` | Staffing rules CSV file. Defaults to the bundled rules. |
 | `--out PATH` | Report file to write, replacing any existing one. Defaults to `roster-check-report.html`. |
 | `--db-file PATH` | Also save the DuckDB database, with its tables and analysis views, to this file. |
-| `--summarise` | Add an AI-written summary. Not available yet; the tool notes that it skipped it. |
+| `--summarise` | Add a short AI-written summary from Claude. See below. |
 | `--strict` | Exit with code 1 if any row was rejected. |
 | `--open` | Open the report in the default browser. |
 | `--debug` | Show the full traceback when something goes wrong. |
@@ -45,6 +45,18 @@ Exit codes:
 | `0` | Success. |
 | `1` | An unexpected error, or `--strict` found rejected rows. |
 | `2` | An input or output problem: an input file that cannot be used (no report is written), an output folder that does not exist, a report or database file that cannot be written, or `--out` and `--db-file` naming the same file. |
+
+### Optional AI summary
+
+With `--summarise`, the report's summary panel shows a 3 to 5 sentence summary written by Claude, labelled as AI-generated. It needs the optional `ai` extra and an Anthropic API key:
+
+```bash
+uv sync --extra ai
+export ANTHROPIC_API_KEY=your-key    # PowerShell: $env:ANTHROPIC_API_KEY = "your-key"
+uv run roster-check --summarise
+```
+
+Only aggregated figures are sent: counts, centre names, activities, days and times. Staff names, staff IDs and session IDs are never sent. The model defaults to `claude-opus-5-5` and can be changed with `ROSTER_CHECK_MODEL`. Without a key or the extra, or if the request fails, the tool says so in one line and the report keeps its standard summary with a short note.
 
 Run the tests and checks:
 

@@ -64,6 +64,8 @@ def render_report(
     generated_at: datetime,
     version: str,
     sample_data: bool,
+    ai_summary: str | None = None,
+    ai_summary_unavailable: bool = False,
 ) -> str:
     """Render the full HTML report.
 
@@ -75,6 +77,10 @@ def render_report(
         version: The tool version, shown in the footer.
         sample_data: True when the bundled sample data was used, which adds
             a note that all data in the report is fictional.
+        ai_summary: Claude's summary, shown labelled as AI-generated in place
+            of the rule-based summary. ``None`` shows the rule-based summary.
+        ai_summary_unavailable: True when an AI summary was asked for but not
+            produced, which adds a note under the rule-based summary.
 
     Returns:
         The complete HTML page.
@@ -97,6 +103,8 @@ def render_report(
         all_rows_used=report.kpis.rows_rejected == 0,
         kpis=_kpi_tiles(report),
         summary=rule_based_summary(report),
+        ai_summary=ai_summary,
+        ai_summary_unavailable=ai_summary_unavailable,
         centre_chart=_chart(centre_bar_chart(report.centres)),
         heatmap_chart=_chart(heatmap(report.heatmap)),
         daily_chart=_chart(daily_chart(report.daily)),

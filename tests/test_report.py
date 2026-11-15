@@ -137,6 +137,8 @@ def render(
     data_files: list[ValidationResult[Any]] | None = None,
     *,
     sample_data: bool = False,
+    ai_summary: str | None = None,
+    ai_summary_unavailable: bool = False,
 ) -> str:
     """Render a report with fixed values for everything but the data."""
     return render_report(
@@ -145,6 +147,8 @@ def render(
         generated_at=GENERATED_AT,
         version="9.9.9",
         sample_data=sample_data,
+        ai_summary=ai_summary,
+        ai_summary_unavailable=ai_summary_unavailable,
     )
 
 
@@ -491,3 +495,36 @@ def test_files_without_problems_are_not_listed() -> None:
 
     assert parse_page(page).headings.count("sessions.csv") == 1
     assert "<h3>" not in page.replace("<h3>sessions.csv</h3>", "")
+
+
+def test_ai_summary_replaces_the_rule_based_summary_with_a_label() -> None:
+    page = render(ai_summary="Staffing held up well.")
+
+    assert '<span class="ai-label">AI-generated</span>' in page
+    assert "<p>Staffing held up well.</p>" in page
+    assert rule_based_summary(make_report())[0] not in page
+
+
+def test_ai_summary_text_is_escaped() -> None:
+    page = render(ai_summary="<script>alert(1)</script> & more")
+
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt; &amp; more" in page
+
+
+def test_unavailable_ai_summary_is_noted_under_the_rule_based_summary() -> None:
+    page = render(ai_summary_unavailable=True)
+
+    assert rule_based_summary(make_report())[0] in page
+    assert (
+        "The AI summary was unavailable, so this summary was built from the numbers."
+        in page
+    )
+    assert "AI-generated" not in page
+
+
+def test_report_without_an_ai_request_has_no_ai_label_or_note() -> None:
+    page = render()
+
+    assert "AI-generated" not in page
+    assert "AI summary was unavailable" not in page

@@ -318,7 +318,7 @@ roster-check/
 | `analysis` | connection | `ReportData` dataclass | All numbers the report needs, nothing else. |
 | `charts` | `ReportData` parts (`CentreSummary`, `HeatmapCell`, `DailyTotal`) and plain numbers | SVG strings | No DuckDB, no Jinja. No colours or animation in the SVG: CSS classes only. |
 | `summarise` | `ReportData` | `str` or `None` | Sends aggregates only. Returns `None` on any failure. |
-| `report` | `ReportData`, each data file's `ValidationResult`, generated time, version, sample-data flag | HTML string | Draws the charts, writes the rule-based summary. Writing to disk happens in `cli`. The AI summary is added in M7. |
+| `report` | `ReportData`, each data file's `ValidationResult`, generated time, version, sample-data flag, optional AI summary text and an "AI summary unavailable" flag | HTML string | Draws the charts, writes the rule-based summary, and shows the AI summary in its place when given. Writing to disk happens in `cli`. |
 | `cli` | argv | exit code | The only module that prints or touches the filesystem for output. |
 
 ### 6.2.1 Data structures
@@ -379,7 +379,7 @@ roster-check [--rosters PATH] [--sessions PATH] [--rules PATH]
 
 ### 6.4 The optional Claude summary
 
-- Enabled only by `--summarise`. If `ANTHROPIC_API_KEY` is not set or the `anthropic` package is not installed, print one line ("Skipping AI summary: no API key set") and continue.
+- Enabled only by `--summarise`. If `ANTHROPIC_API_KEY` is not set, print "Skipping AI summary: no API key set"; if the `anthropic` package is not installed, print "Skipping AI summary: the anthropic package is not installed (install roster-check[ai])"; then continue (see D39).
 - Uses the official `anthropic` Python SDK. Model is configurable with `ROSTER_CHECK_MODEL`, defaulting to `claude-opus-5-5`.
 - The prompt contains only aggregated numbers and the top understaffed sessions (centre, activity, day, time, shortfall). No staff names or IDs are ever sent. A test asserts this.
 - Short timeout, check `stop_reason` before reading the text, and treat any error as "no summary". The report notes when the summary was unavailable.
@@ -520,9 +520,11 @@ Decisions made after the first draft of this brief, before sample data and valid
 | D34 | `--summarise` is accepted from M6 and prints "Skipping AI summary: not available in this version" until M7. `--db-file` is built in M6. The preview script is removed now that the command writes the report. | The command line is complete in M6 as 6.3 lists it; M7 only replaces the stub. | 6.3, 9 |
 | D35 | Rows changed by cleaning count as auto-fixed; rows with any other warning, such as attendance above capacity, count as flagged. The report lists both in one collapsed "Auto-fixed or flagged" list. | Case 8 is kept and flagged, not fixed, so calling it auto-fixed would be wrong. | 4.4, 5.2 |
 | D36 | `db` loads into a connection it is given and opens an in-memory one otherwise; `cli` opens the file-backed connection for `--db-file`. | Keeps writing files in `cli`, as the module contracts require. | 6.2 |
+| D37 | The Claude prompt is a fixed system prompt (3 to 5 plain sentences in Australian English, figures given only, no invented causes or advice, no markdown) and a user message listing the headline numbers, every centre's understaffing, the five largest day-and-hour gaps and the five worst sessions by centre, activity, date, time and need. Session IDs are left out as well as staff details. | Factual and checkable against the report; nothing in the prompt identifies a person or a record. | 6.4 |
+| D38 | Requests use effort `low`, `max_tokens` 16000, a 30 second timeout and one retry, and only a response with `stop_reason` `end_turn` is used. Server-side refusal fallback (`fallbacks: "default"`) is sent only with the default model. | A short factual summary needs little reasoning. A custom `ROSTER_CHECK_MODEL` may not support fallbacks, and any model should work. | 6.4 |
+| D39 | Each reason for a missing summary has its own terminal line: no API key, the `anthropic` package not installed, or the request failed. Whenever `--summarise` was used and no summary was produced, the report keeps the rule-based summary and adds a one-line note. | Tells the user what to fix; the report never claims an AI summary it does not have. | 6.4, 5.2 |
+| D40 | `summarise` reuses the date, percentage and shortfall wording helpers from `report`; `report` never imports `summarise`. | The prompt describes figures in exactly the words the report uses, with no duplicated formatting code. | 6.2 |
 
 ### Still open
 
-These are decided at the start of the milestone that needs them:
-
-- The wording of the Claude prompt (6.4). Before M7.
+Nothing is open. New questions are decided at the start of the milestone that needs them.
