@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
 
-import anthropic
 import pytest
 from builders import run_sample
 
@@ -21,6 +20,9 @@ from roster_check.summarise import (
     skip_reason,
     summarise,
 )
+
+# The anthropic package is an optional extra; without it these tests are skipped.
+anthropic = pytest.importorskip("anthropic")
 
 KEY = {"ANTHROPIC_API_KEY": "test-key-not-real"}
 
