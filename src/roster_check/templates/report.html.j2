@@ -45,8 +45,16 @@
   </section>
 
   <section class="card summary" aria-labelledby="summary-heading">
+    {% if ai_summary %}
+    <h2 id="summary-heading">Summary <span class="ai-label">AI-generated</span></h2>
+    <p>{{ ai_summary }}</p>
+    {% else %}
     <h2 id="summary-heading">Summary</h2>
     <p>{{ summary | join(" ") }}</p>
+    {% if ai_summary_unavailable %}
+    <p class="summary-note">The AI summary was unavailable, so this summary was built from the numbers.</p>
+    {% endif %}
+    {% endif %}
   </section>
 
   <section class="card animate" aria-labelledby="centres-heading">
