@@ -21,9 +21,6 @@ from roster_check.summarise import (
     summarise,
 )
 
-# The anthropic package is an optional extra; without it these tests are skipped.
-anthropic = pytest.importorskip("anthropic")
-
 KEY = {"ANTHROPIC_API_KEY": "test-key-not-real"}
 
 
@@ -98,6 +95,8 @@ def test_missing_package_skips_the_summary(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_key_and_package_present_allow_the_summary() -> None:
+    pytest.importorskip("anthropic")
+
     assert skip_reason(KEY) is None
 
 
@@ -186,17 +185,19 @@ def test_response_without_text_gives_no_summary(
     assert summarise(sample[0], client=client, environ=KEY) is None
 
 
-@pytest.mark.parametrize(
-    "error",
-    [
-        RuntimeError("unexpected"),
-        anthropic.APIConnectionError(request=None),
-    ],
-)
 def test_client_error_gives_no_summary(
-    error: Exception, sample: tuple[ReportData, tuple[Shift, ...]]
+    sample: tuple[ReportData, tuple[Shift, ...]],
 ) -> None:
-    client = FakeClient(error=error)
+    client = FakeClient(error=RuntimeError("unexpected"))
+
+    assert summarise(sample[0], client=client, environ=KEY) is None
+
+
+def test_sdk_connection_error_gives_no_summary(
+    sample: tuple[ReportData, tuple[Shift, ...]],
+) -> None:
+    anthropic = pytest.importorskip("anthropic")
+    client = FakeClient(error=anthropic.APIConnectionError(request=None))
 
     assert summarise(sample[0], client=client, environ=KEY) is None
 
@@ -210,6 +211,7 @@ def test_missing_key_without_a_client_gives_no_summary(
 def test_client_is_created_from_the_environment_key_with_a_short_timeout(
     monkeypatch: pytest.MonkeyPatch, sample: tuple[ReportData, tuple[Shift, ...]]
 ) -> None:
+    anthropic = pytest.importorskip("anthropic")
     created: list[dict[str, Any]] = []
 
     def fake_anthropic(**options: Any) -> FakeClient:
