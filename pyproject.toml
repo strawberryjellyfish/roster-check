@@ -1,6 +1,6 @@
 [project]
 name = "roster-check"
-version = "0.1.0"
+version = "1.0.0"
 description = "Checks recreation centre rosters against session attendance and reports understaffed sessions."
 readme = "README.md"
 license = "MIT"

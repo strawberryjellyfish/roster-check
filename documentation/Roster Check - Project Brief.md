@@ -2,7 +2,7 @@
 
 **Author:** Robert Miller
 **Date:** 14 November 2026
-**Status:** Ready to build
+**Status:** Released as v1.0.0
 
 ---
 
